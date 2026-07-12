@@ -1,0 +1,23 @@
+[
+    {
+        "id": "DS-178378496980",
+        "amount": 10000,
+        "clientName": "Awa Ndiaye",
+        "clientPhone": "705606100",
+        "clientEmail": "client@gmail.com",
+        "status": "Payée (En attente d'expédition)",
+        "is_mock": true,
+        "payout_number": "770000000",
+        "payout_carrier": "wave",
+        "items": [
+            {
+                "id": "prod-003",
+                "name": "Crème Karité Fondante Bio",
+                "qty": 1,
+                "price": 8500,
+                "size": "U"
+            }
+        ],
+        "date": "2026-07-11 15:49:30"
+    }
+]
