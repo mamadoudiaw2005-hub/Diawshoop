@@ -853,9 +853,14 @@ const db = {
 
 
 
-        const { data, error } = await supabaseClient.from('diawshoop_products').insert([payload]).select().single();
-
-
+        let { data, error } = await supabaseClient.from('diawshoop_products').insert([payload]).select().single();
+        if (error && error.message && error.message.includes("'is_promo'")) {
+            console.warn("Notice: colonne 'is_promo' absente dans le schéma Supabase, repli automatique sans is_promo...");
+            delete payload.is_promo;
+            const retry = await supabaseClient.from('diawshoop_products').insert([payload]).select().single();
+            data = retry.data;
+            error = retry.error;
+        }
 
         return { data, error };
 
@@ -953,9 +958,14 @@ const db = {
 
 
 
-        const { data, error } = await supabaseClient.from('diawshoop_products').update(payload).eq('id', String(id));
-
-
+        let { data, error } = await supabaseClient.from('diawshoop_products').update(payload).eq('id', String(id));
+        if (error && error.message && error.message.includes("'is_promo'")) {
+            console.warn("Notice: colonne 'is_promo' absente dans le schéma Supabase, repli automatique sans is_promo...");
+            delete payload.is_promo;
+            const retry = await supabaseClient.from('diawshoop_products').update(payload).eq('id', String(id));
+            data = retry.data;
+            error = retry.error;
+        }
 
         return { data, error };
 
