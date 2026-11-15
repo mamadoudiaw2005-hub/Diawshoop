@@ -4722,3 +4722,9 @@ input:checked + .slider:before {
         left: 6px;
     }
 }
+
+/* Masquage des boutons flottants sur les photos : plein écran activé uniquement au clic sur l'image */
+.card-quick-zoom-btn,
+.btn-fullscreen-trigger {
+    display: none !important;
+}

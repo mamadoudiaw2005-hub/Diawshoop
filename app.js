@@ -4944,7 +4944,6 @@ function renderProductList() {
 
 
 
-                <button type="button" class="card-quick-zoom-btn" onclick="event.stopPropagation(); if (typeof openFullscreenViewer === 'function') openFullscreenViewer('${escapeHTML(p.image)}', '${escapeHTML(p.name)}', ${Number(p.price)}, '${escapeHTML(p.category)}');" title="Agrandir la photo"><i class="fa-solid fa-expand"></i></button>
                 <img src="${escapeHTML(p.image)}" alt="${escapeHTML(p.name)}" onerror="this.src='https://placehold.co/400x500?text=${encodeURIComponent(p.name)}'">
 
 
@@ -6109,27 +6108,14 @@ function openProductDetail(id) {
 
         elements.modalMediaContainer.appendChild(img);
 
-        // Agrandissement Plein Écran
+        // Agrandissement Plein Écran au clic/toucher direct sur la photo
         img.style.cursor = "zoom-in";
-        img.title = "Touchez pour agrandir en plein écran";
+        img.title = "Cliquez ou touchez la photo pour l'afficher en plein écran";
         img.addEventListener("click", () => {
             if (typeof openFullscreenViewer === "function") {
                 openFullscreenViewer(currentDetailProduct.image, currentDetailProduct.name, currentDetailProduct.price, currentDetailProduct.category);
             }
         });
-
-        const fsTrigger = document.createElement("button");
-        fsTrigger.type = "button";
-        fsTrigger.className = "btn-fullscreen-trigger";
-        fsTrigger.title = "Agrandir la photo en plein écran";
-        fsTrigger.innerHTML = '<i class="fa-solid fa-expand"></i> <span>Plein écran</span>';
-        fsTrigger.addEventListener("click", (e) => {
-            e.stopPropagation();
-            if (typeof openFullscreenViewer === "function") {
-                openFullscreenViewer(currentDetailProduct.image, currentDetailProduct.name, currentDetailProduct.price, currentDetailProduct.category);
-            }
-        });
-        elements.modalMediaContainer.appendChild(fsTrigger);
 
 
 
