@@ -2375,22 +2375,18 @@ initializeStorage();
 
 
 let products = JSON.parse(localStorage.getItem("diaw_shoop_products")) || [];
-
-
+if (!Array.isArray(products)) products = [];
 
 let orders = JSON.parse(localStorage.getItem("diaw_shoop_orders")) || [];
-
-
+if (!Array.isArray(orders)) orders = [];
 
 let currentUser = JSON.parse(sessionStorage.getItem("diaw_shoop_current_user")) || null;
 
-
-
 let cart = JSON.parse(localStorage.getItem("diaw_shoop_cart")) || [];
-
-
+if (!Array.isArray(cart)) cart = [];
 
 let reviews = JSON.parse(localStorage.getItem("diaw_shoop_reviews")) || [];
+if (!Array.isArray(reviews)) reviews = [];
 
 
 
@@ -4980,7 +4976,7 @@ function renderProductList() {
 
 
 
-                <button class="quick-add-btn" onclick="quickAddToCart('${p.id}')" title="Ajout rapide au panier">
+                <button class="quick-add-btn" onclick="event.stopPropagation(); quickAddToCart('${p.id}')" title="Ajout rapide au panier">
 
 
 
@@ -5954,7 +5950,7 @@ function openProductDetail(id) {
 
 
 
-    currentDetailProduct = products.find(p => p.id === id);
+    currentDetailProduct = products.find(p => String(p.id) === String(id));
 
 
 
@@ -6528,12 +6524,19 @@ elements.btnCloseProductModal.addEventListener("click", () => {
 
 
 elements.modalBtnAddCart.addEventListener("click", () => {
-    if (!currentDetailProduct) return;
+    if (!currentDetailProduct) {
+        console.warn("Notice : aucun article sélectionné.");
+        return;
+    }
 
     // Le choix de taille est facultatif pour la cliente :
     const finalSize = selectedSize || "U";
-    addToCart(currentDetailProduct.id, finalSize);
+    
+    // Fermer la vue détaillée
     elements.productDetailModal.classList.remove("open");
+    
+    // Ajouter au panier ET ouvrir immédiatement le tiroir du panier pour une confirmation claire
+    addToCart(currentDetailProduct.id, finalSize, true);
 });
 
 // WhatsApp Direct Purchase order (Senegal specific conversion optimization)
@@ -6565,105 +6568,32 @@ elements.modalBtnWhatsapp.addEventListener("click", () => {
 
 
 function quickAddToCart(productId) {
-
-
-
-    const prod = products.find(p => p.id === productId);
-
-
-
+    const prod = products.find(p => String(p.id) === String(productId));
     if (!prod) return;
 
-
-
-
-
-
-
     // Si le produit est en taille unique (Abayas, voiles, soins, parfums...)
-
-
-
     if (!productRequiresSize(prod)) {
-
-
-
-        addToCart(productId, "U");
-
-
-
+        addToCart(productId, "U", true);
         return;
-
-
-
     }
-
-
-
-
-
-
 
     // Trouver la première taille avec stock positif
-
-
-
     let sizeFound = null;
-
-
-
     const sizes = ["M", "S", "L", "XL", "XS", "2XL"];
-
-
-
     for (let s of sizes) {
-
-
-
         if (prod.stocks && prod.stocks[s] > 0) {
-
-
-
             sizeFound = s;
-
-
-
             break;
-
-
-
         }
-
-
-
     }
-
-
-
-
-
-
 
     if (sizeFound) {
-
-
-
-        addToCart(productId, sizeFound);
-
-
-
-    } else {
-
-
-
-        openProductDetail(productId);
-
-
-
+        addToCart(productId, sizeFound, true);
+        return;
     }
 
-
-
+    // Si besoin d'un choix explicite de taille, ouvrir la fiche produit
+    openProductDetail(productId);
 }
 
 
@@ -6676,198 +6606,68 @@ function quickAddToCart(productId) {
 
 
 
-function addToCart(id, size, openDrawer = false) {
+function addToCart(id, size, openDrawer = true) {
+    if (!Array.isArray(cart)) cart = [];
 
+    const prod = products.find(p => String(p.id) === String(id));
+    if (!prod) {
+        console.warn("addToCart : Article introuvable pour l'ID", id);
+        showToast("Impossible de trouver cet article.", "error");
+        return;
+    }
 
-
-    const prod = products.find(p => p.id === id);
-
-
-
-    if (!prod) return;
-
-
-
-
-
-
-
-    // Normalize size: null for cosmetics/items without size
-
-
-
+    // Normalisation de la taille : null pour les produits taille unique ou cosmétiques
     const effectiveSize = (size && size !== "U" && size !== "none") ? size : null;
 
+    // Vérifier si l'article est déjà présent dans le panier
+    const existing = cart.find(item => String(item.id) === String(id) && (item.size === effectiveSize || (!item.size && !effectiveSize)));
 
-
-
-
-
-
-    // Check if item is already in cart
-
-
-
-    const existing = cart.find(item => item.id === id && (item.size === effectiveSize || (!item.size && !effectiveSize)));
-
-
-
-
-
-
-
-    // Check stock limit (fallback to standard stock)
-
-
-
-    let currentStock = 99;
-
-
-
-    if (prod.stocks) {
-
-
-
+    // Calcul du stock disponible (priorité au stock spécifique de la taille, puis total, puis 99)
+    let currentStock = (prod.stock !== undefined && prod.stock !== null) ? Number(prod.stock) : 99;
+    if (prod.stocks && typeof prod.stocks === "object") {
         if (effectiveSize && prod.stocks[effectiveSize] !== undefined) {
-
-
-
-            currentStock = prod.stocks[effectiveSize];
-
-
-
-        } else if (prod.stocks.S !== undefined) {
-
-
-
-            currentStock = prod.stocks.S;
-
-
-
+            currentStock = Number(prod.stocks[effectiveSize]);
         } else if (prod.stocks.total !== undefined) {
-
-
-
-            currentStock = prod.stocks.total;
-
-
-
+            currentStock = Number(prod.stocks.total);
+        } else if (prod.stocks.S !== undefined && (!prod.stocks.total || prod.stocks.total <= 0)) {
+            currentStock = Number(prod.stocks.S);
         }
-
-
-
     }
 
-
-
-
-
-
+    if (currentStock <= 0) {
+        const errorMsg = effectiveSize ? `Désolé, la taille ${effectiveSize} est en rupture de stock.` : "Désolé, cet article est actuellement en rupture de stock.";
+        showToast(errorMsg, "error");
+        return;
+    }
 
     if (existing) {
-
-
-
         if (existing.qty >= currentStock) {
-
-
-
-            const errorMsg = effectiveSize ? `Désolé, stock insuffisant pour la taille ${effectiveSize}.` : "Désolé, stock insuffisant pour cet article.";
-
-
-
+            const errorMsg = effectiveSize ? `Stock insuffisant pour la taille ${effectiveSize} (max: ${currentStock}).` : `Stock insuffisant pour cet article (max: ${currentStock}).`;
             showToast(errorMsg, "error");
-
-
-
             return;
-
-
-
         }
-
-
-
         existing.qty += 1;
-
-
-
     } else {
-
-
-
         cart.push({
-
-
-
-            id: prod.id,
-
-
-
+            id: String(prod.id),
             name: prod.name,
-
-
-
-            price: prod.price,
-
-
-
-            image: prod.image,
-
-
-
+            price: Number(prod.price || 0),
+            image: prod.image || prod.image_url || 'https://placehold.co/400x500?text=Produit',
             size: effectiveSize,
-
-
-
             qty: 1
-
-
-
         });
-
-
-
     }
-
-
-
-
-
-
 
     saveCart();
-
-
-
     renderCart();
 
-
-
     if (openDrawer) {
-
-
-
-        elements.cartSidebar.classList.add("open");
-
-
-
-        elements.sidebarOverlay.classList.add("open");
-
-
-
+        if (elements.cartSidebar) elements.cartSidebar.classList.add("open");
+        if (elements.sidebarOverlay) elements.sidebarOverlay.classList.add("open");
     }
 
-
-
     const displayLabel = effectiveSize ? `${prod.name} (${effectiveSize})` : prod.name;
-
-
-
     showToast(`"${displayLabel}" ajouté au panier !`, "success");
-
-
-
 }
 
 
@@ -7108,7 +6908,7 @@ function updateCartQty(id, size, change) {
 
 
 
-    const item = cart.find(i => i.id === id && ((!i.size && !targetSize) || i.size === targetSize));
+    const item = cart.find(i => String(i.id) === String(id) && ((!i.size && !targetSize) || i.size === targetSize));
 
 
 
@@ -7120,7 +6920,7 @@ function updateCartQty(id, size, change) {
 
 
 
-    const prod = products.find(p => p.id === id);
+    const prod = products.find(p => String(p.id) === String(id));
 
 
 
@@ -7236,7 +7036,7 @@ function removeFromCart(id, size) {
 
 
 
-    cart = cart.filter(item => !(item.id === id && ((!item.size && !targetSize) || item.size === targetSize)));
+    cart = cart.filter(item => !(String(item.id) === String(id) && ((!item.size && !targetSize) || item.size === targetSize)));
 
 
 
