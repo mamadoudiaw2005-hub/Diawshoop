@@ -4944,6 +4944,7 @@ function renderProductList() {
 
 
 
+                <button type="button" class="card-quick-zoom-btn" onclick="event.stopPropagation(); if (typeof openFullscreenViewer === 'function') openFullscreenViewer('${escapeHTML(p.image)}', '${escapeHTML(p.name)}', ${Number(p.price)}, '${escapeHTML(p.category)}');" title="Agrandir la photo"><i class="fa-solid fa-expand"></i></button>
                 <img src="${escapeHTML(p.image)}" alt="${escapeHTML(p.name)}" onerror="this.src='https://placehold.co/400x500?text=${encodeURIComponent(p.name)}'">
 
 
@@ -6107,6 +6108,28 @@ function openProductDetail(id) {
 
 
         elements.modalMediaContainer.appendChild(img);
+
+        // Agrandissement Plein Écran
+        img.style.cursor = "zoom-in";
+        img.title = "Touchez pour agrandir en plein écran";
+        img.addEventListener("click", () => {
+            if (typeof openFullscreenViewer === "function") {
+                openFullscreenViewer(currentDetailProduct.image, currentDetailProduct.name, currentDetailProduct.price, currentDetailProduct.category);
+            }
+        });
+
+        const fsTrigger = document.createElement("button");
+        fsTrigger.type = "button";
+        fsTrigger.className = "btn-fullscreen-trigger";
+        fsTrigger.title = "Agrandir la photo en plein écran";
+        fsTrigger.innerHTML = '<i class="fa-solid fa-expand"></i> <span>Plein écran</span>';
+        fsTrigger.addEventListener("click", (e) => {
+            e.stopPropagation();
+            if (typeof openFullscreenViewer === "function") {
+                openFullscreenViewer(currentDetailProduct.image, currentDetailProduct.name, currentDetailProduct.price, currentDetailProduct.category);
+            }
+        });
+        elements.modalMediaContainer.appendChild(fsTrigger);
 
 
 
@@ -18862,3 +18885,254 @@ if (btnRefreshSupportMessages) {
 
 
 
+
+
+// =====================================================================
+// MODE PLEIN ÉCRAN POUR PHOTOS PRODUITS (LIGHTBOX MOBILE/DESKTOP)
+// =====================================================================
+let fsScale = 1;
+let fsTranslateX = 0;
+let fsTranslateY = 0;
+let fsIsDragging = false;
+let fsStartX = 0;
+let fsStartY = 0;
+let fsLastTap = 0;
+let fsInitialPinchDist = 0;
+let fsInitialScale = 1;
+
+function updateFsTransform() {
+    const stage = document.getElementById("fs-image-stage");
+    if (stage) {
+        stage.style.transform = `translate(${fsTranslateX}px, ${fsTranslateY}px) scale(${fsScale})`;
+    }
+}
+
+function openFullscreenViewer(imageUrl, title, price, category) {
+    if (!imageUrl) return;
+    const viewer = document.getElementById("fullscreen-photo-viewer");
+    const img = document.getElementById("fs-viewer-img");
+    const titleEl = document.getElementById("fs-viewer-title");
+    const priceEl = document.getElementById("fs-viewer-price");
+    const catEl = document.getElementById("fs-viewer-cat");
+
+    if (!viewer || !img) return;
+
+    img.src = imageUrl;
+    if (titleEl) titleEl.textContent = title || "Produit";
+    if (priceEl) {
+        priceEl.textContent = typeof price === "number" ? Number(price).toLocaleString("fr-FR") + " FCFA" : (price || "");
+    }
+    if (catEl) catEl.textContent = (category || "DIAW SHOOP").toUpperCase();
+
+    // Réinitialisation de la vue
+    fsScale = 1;
+    fsTranslateX = 0;
+    fsTranslateY = 0;
+    updateFsTransform();
+
+    viewer.style.display = "flex";
+    if (typeof requestAnimationFrame === "function") {
+        requestAnimationFrame(() => {
+            viewer.classList.add("active");
+            viewer.setAttribute("aria-hidden", "false");
+        });
+    } else {
+        viewer.classList.add("active");
+        viewer.setAttribute("aria-hidden", "false");
+    }
+
+    if (typeof document !== "undefined" && document.body) {
+        document.body.style.overflow = "hidden";
+    }
+}
+
+function closeFullscreenViewer() {
+    const viewer = document.getElementById("fullscreen-photo-viewer");
+    if (!viewer) return;
+
+    viewer.classList.remove("active");
+    viewer.setAttribute("aria-hidden", "true");
+    if (typeof document !== "undefined" && document.body) {
+        document.body.style.overflow = "";
+    }
+
+    setTimeout(() => {
+        if (!viewer.classList.contains("active")) {
+            viewer.style.display = "none";
+            const img = document.getElementById("fs-viewer-img");
+            if (img) img.src = "";
+        }
+    }, 280);
+}
+
+function initFullscreenViewer() {
+    if (typeof document === "undefined") return;
+    const viewer = document.getElementById("fullscreen-photo-viewer");
+    if (!viewer) return;
+
+    const btnClose = document.getElementById("fs-btn-close");
+    const btnZoomIn = document.getElementById("fs-btn-zoom-in");
+    const btnZoomOut = document.getElementById("fs-btn-zoom-out");
+    const btnZoomReset = document.getElementById("fs-btn-zoom-reset");
+    const bodyEl = document.getElementById("fs-viewer-body");
+
+    if (btnClose) btnClose.addEventListener("click", closeFullscreenViewer);
+
+    if (btnZoomIn) {
+        btnZoomIn.addEventListener("click", () => {
+            fsScale = Math.min(fsScale + 0.5, 4);
+            updateFsTransform();
+        });
+    }
+
+    if (btnZoomOut) {
+        btnZoomOut.addEventListener("click", () => {
+            fsScale = Math.max(fsScale - 0.5, 1);
+            if (fsScale === 1) {
+                fsTranslateX = 0;
+                fsTranslateY = 0;
+            }
+            updateFsTransform();
+        });
+    }
+
+    if (btnZoomReset) {
+        btnZoomReset.addEventListener("click", () => {
+            fsScale = 1;
+            fsTranslateX = 0;
+            fsTranslateY = 0;
+            updateFsTransform();
+        });
+    }
+
+    // Fermeture avec la touche Échap
+    if (typeof window !== "undefined") {
+        window.addEventListener("keydown", (e) => {
+            if (e.key === "Escape" && viewer.classList.contains("active")) {
+                closeFullscreenViewer();
+            }
+        });
+    }
+
+    // Gestes tactiles sur mobile
+    if (bodyEl) {
+        bodyEl.addEventListener("touchstart", (e) => {
+            if (e.touches && e.touches.length === 2) {
+                // Début pinch-to-zoom
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                fsInitialPinchDist = Math.hypot(dx, dy);
+                fsInitialScale = fsScale;
+            } else if (e.touches && e.touches.length === 1) {
+                const now = Date.now();
+                if (now - fsLastTap < 300) {
+                    // Double tap détecté : bascule du zoom
+                    if (fsScale > 1.2) {
+                        fsScale = 1;
+                        fsTranslateX = 0;
+                        fsTranslateY = 0;
+                    } else {
+                        fsScale = 2.2;
+                    }
+                    updateFsTransform();
+                }
+                fsLastTap = now;
+
+                if (fsScale > 1) {
+                    fsIsDragging = true;
+                    fsStartX = e.touches[0].clientX - fsTranslateX;
+                    fsStartY = e.touches[0].clientY - fsTranslateY;
+                }
+            }
+        }, { passive: true });
+
+        bodyEl.addEventListener("touchmove", (e) => {
+            if (e.touches && e.touches.length === 2 && fsInitialPinchDist > 0) {
+                // Pinch to zoom actif
+                const dx = e.touches[0].clientX - e.touches[1].clientX;
+                const dy = e.touches[0].clientY - e.touches[1].clientY;
+                const dist = Math.hypot(dx, dy);
+                fsScale = Math.min(Math.max((dist / fsInitialPinchDist) * fsInitialScale, 1), 4);
+                updateFsTransform();
+            } else if (e.touches && e.touches.length === 1 && fsIsDragging && fsScale > 1) {
+                // Déplacement du zoom
+                fsTranslateX = e.touches[0].clientX - fsStartX;
+                fsTranslateY = e.touches[0].clientY - fsStartY;
+                updateFsTransform();
+            }
+        }, { passive: true });
+
+        bodyEl.addEventListener("touchend", (e) => {
+            if (e.touches && e.touches.length < 2) {
+                fsInitialPinchDist = 0;
+            }
+            if (e.touches && e.touches.length === 0) {
+                fsIsDragging = false;
+                if (fsScale <= 1) {
+                    fsTranslateX = 0;
+                    fsTranslateY = 0;
+                    updateFsTransform();
+                }
+            }
+        });
+
+        // Souris Desktop : glisser pour observer quand zoomé
+        bodyEl.addEventListener("mousedown", (e) => {
+            if (fsScale > 1) {
+                fsIsDragging = true;
+                bodyEl.classList.add("is-dragging");
+                fsStartX = e.clientX - fsTranslateX;
+                fsStartY = e.clientY - fsTranslateY;
+            }
+        });
+
+        if (typeof window !== "undefined") {
+            window.addEventListener("mousemove", (e) => {
+                if (fsIsDragging && fsScale > 1) {
+                    fsTranslateX = e.clientX - fsStartX;
+                    fsTranslateY = e.clientY - fsStartY;
+                    updateFsTransform();
+                }
+            });
+
+            window.addEventListener("mouseup", () => {
+                if (fsIsDragging) {
+                    fsIsDragging = false;
+                    bodyEl.classList.remove("is-dragging");
+                }
+            });
+        }
+
+        // Double clic souris
+        bodyEl.addEventListener("dblclick", () => {
+            if (fsScale > 1.2) {
+                fsScale = 1;
+                fsTranslateX = 0;
+                fsTranslateY = 0;
+            } else {
+                fsScale = 2.2;
+            }
+            updateFsTransform();
+        });
+
+        // Clic sur l'arrière-plan pour fermer si non zoomé
+        bodyEl.addEventListener("click", (e) => {
+            if (e.target === bodyEl && fsScale === 1) {
+                closeFullscreenViewer();
+            }
+        });
+    }
+}
+
+// Rendre accessible globalement
+if (typeof window !== "undefined") {
+    window.openFullscreenViewer = openFullscreenViewer;
+    window.closeFullscreenViewer = closeFullscreenViewer;
+    if (typeof document !== "undefined") {
+        if (document.readyState === "loading") {
+            document.addEventListener("DOMContentLoaded", initFullscreenViewer);
+        } else {
+            initFullscreenViewer();
+        }
+    }
+}

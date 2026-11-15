@@ -2584,9 +2584,52 @@
 
 
 
-    <!-- Local Application Javascript -->
+    <!-- ============================================================= -->
+    <!-- Mode Plein Écran Photo Produit (Mobile & Desktop Lightbox)    -->
+    <!-- ============================================================= -->
+    <div id="fullscreen-photo-viewer" class="fullscreen-photo-viewer" style="display: none;" aria-hidden="true">
+        <!-- Barre supérieure de contrôle -->
+        <div class="fs-viewer-header">
+            <div class="fs-viewer-info">
+                <span class="fs-viewer-cat" id="fs-viewer-cat">CATÉGORIE</span>
+                <h3 class="fs-viewer-title" id="fs-viewer-title">Nom du produit</h3>
+            </div>
+            <div class="fs-viewer-controls">
+                <button type="button" class="fs-ctrl-btn" id="fs-btn-zoom-in" title="Zoom avant (ou double-toucher)">
+                    <i class="fa-solid fa-magnifying-glass-plus"></i>
+                </button>
+                <button type="button" class="fs-ctrl-btn" id="fs-btn-zoom-out" title="Zoom arrière">
+                    <i class="fa-solid fa-magnifying-glass-minus"></i>
+                </button>
+                <button type="button" class="fs-ctrl-btn" id="fs-btn-zoom-reset" title="Taille réelle">
+                    <i class="fa-solid fa-arrows-rotate"></i>
+                </button>
+                <button type="button" class="fs-ctrl-btn fs-close-btn" id="fs-btn-close" title="Fermer le plein écran">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+        </div>
 
-    <script src="app.js?v=16"></script>
+        <!-- Zone d'affichage et de manipulation de l'image -->
+        <div class="fs-viewer-body" id="fs-viewer-body">
+            <div class="fs-image-stage" id="fs-image-stage">
+                <img id="fs-viewer-img" src="" alt="Photo produit en plein écran" draggable="false">
+            </div>
+        </div>
+
+        <!-- Barre inférieure : Conseils tactiles & Prix -->
+        <div class="fs-viewer-footer">
+            <div class="fs-viewer-tip">
+                <i class="fa-solid fa-hand-pointer"></i> <span>Double-touchez pour zoomer • Glissez pour observer les détails</span>
+            </div>
+            <div class="fs-viewer-price" id="fs-viewer-price">
+                0 FCFA
+            </div>
+        </div>
+    </div>
+
+    <!-- Local Application Javascript -->
+    <script src="app.js?v=17"></script>
 
 </body>
 
