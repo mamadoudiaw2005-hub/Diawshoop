@@ -3495,6 +3495,10 @@ function updateUserUI() {
 
 
         elements.userDropdownContainer.style.display = "block";
+        const headerOrdersBtn = document.getElementById("header-orders-trigger");
+        if (headerOrdersBtn) {
+            headerOrdersBtn.style.display = "flex";
+        }
 
 
 
@@ -3571,6 +3575,10 @@ function updateUserUI() {
 
 
         elements.userDropdownContainer.style.display = "none";
+        const headerOrdersBtn = document.getElementById("header-orders-trigger");
+        if (headerOrdersBtn) {
+            headerOrdersBtn.style.display = "none";
+        }
 
 
 
@@ -8463,7 +8471,8 @@ function finalizeOnlineOrder(transactionId, paymentMethodUsed) {
 
 
 
-        clientEmail: clientEmail,
+        userId: currentUser ? (currentUser.id || currentUser.email) : null,
+        clientEmail: clientEmail || (currentUser ? currentUser.email : ""),
 
 
 
@@ -8842,7 +8851,8 @@ function executeSimulatedTransaction(referenceCode) {
 
 
 
-            clientEmail: clientEmail,
+            userId: currentUser ? (currentUser.id || currentUser.email) : null,
+            clientEmail: clientEmail || (currentUser ? currentUser.email : ""),
 
 
 
@@ -9986,19 +9996,29 @@ if (btnGuestSkipAccount) {
 
 
 window.openMyOrdersModal = function () {
-    let clientOrders = [];
-    if (currentUser) {
-        const userEmail = (currentUser.email || "").toLowerCase();
-        const userName = (currentUser.name || "").toLowerCase();
-        clientOrders = orders.filter(o => 
-            (o.clientEmail && o.clientEmail.toLowerCase() === userEmail) ||
-            (userName && o.clientName && o.clientName.toLowerCase() === userName)
-        );
+    if (!currentUser) {
+        showToast("Veuillez vous connecter pour accéder à l'historique de vos commandes.", "info");
+        if (elements.loginModal) {
+            elements.loginModal.classList.add("open");
+        }
+        return;
     }
-    // Si aucun ordre trouvé via le compte ou en mode invité, récupérer toutes les commandes de cet appareil
-    if (clientOrders.length === 0 && orders && orders.length > 0) {
-        clientOrders = [...orders];
-    }
+
+    const userEmail = (currentUser.email || "").trim().toLowerCase();
+    const userName = (currentUser.name || "").trim().toLowerCase();
+    const userPhone = (currentUser.phone || "").replace(/\s+/g, "").slice(-9);
+
+    const clientOrders = (orders || []).filter(o => {
+        const orderEmail = (o.clientEmail || "").trim().toLowerCase();
+        const orderName = (o.clientName || "").trim().toLowerCase();
+        const orderPhone = (o.clientPhone || "").replace(/\s+/g, "").slice(-9);
+        const orderUserId = o.userId || o.user_id;
+
+        return (currentUser.id && orderUserId && String(orderUserId) === String(currentUser.id)) ||
+               (userEmail && orderEmail && orderEmail === userEmail) ||
+               (userPhone && orderPhone && orderPhone.length >= 7 && orderPhone === userPhone) ||
+               (userName && orderName && orderName === userName);
+    });
 
     if (elements.myOrdersList) {
         elements.myOrdersList.innerHTML = "";
@@ -10007,8 +10027,8 @@ window.openMyOrdersModal = function () {
             elements.myOrdersList.innerHTML = `
                 <div style="text-align:center; padding: 40px; color: var(--text-muted)">
                     <i class="fa-solid fa-receipt" style="font-size: 2.8rem; margin-bottom:15px; color: var(--accent);"></i>
-                    <h3 style="font-size: 1.15rem; margin-bottom: 8px; color: var(--primary);">Aucun reçu pour le moment</h3>
-                    <p style="font-size: 0.9rem;">Vos reçus de commande apparaîtront automatiquement ici dès votre premier achat !</p>
+                    <h3 style="font-size: 1.15rem; margin-bottom: 8px; color: var(--primary);">Aucune commande trouvée</h3>
+                    <p style="font-size: 0.9rem;">Vous n'avez pas encore passé de commande avec ce compte (${escapeHTML(currentUser.email || currentUser.name)}).</p>
                 </div>
             `;
         } else {
