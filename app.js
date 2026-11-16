@@ -3439,65 +3439,26 @@ document.querySelectorAll(".btn-toggle-password").forEach(btn => {
 
 
 function showToast(message, type = "success") {
+    if (!elements || !elements.toastContainer) return;
 
-
+    // Sur mobile : supprimer immédiatement tout toast précédent pour ne JAMAIS empiler ni masquer l'écran
+    const oldToasts = elements.toastContainer.querySelectorAll(".toast");
+    oldToasts.forEach(t => t.remove());
 
     const toast = document.createElement("div");
-
-
-
     toast.className = `toast ${type}`;
 
-
-
-
-
-
-
     let iconClass = "fa-circle-check";
-
-
-
     if (type === "error") iconClass = "fa-circle-exclamation";
-
-
-
     if (type === "info") iconClass = "fa-circle-info";
 
-
-
-
-
-
-
     toast.innerHTML = `<i class="fa-solid ${iconClass}"></i> <span>${escapeHTML(message)}</span>`;
-
-
-
     elements.toastContainer.appendChild(toast);
 
-
-
-
-
-
-
     setTimeout(() => {
-
-
-
-        toast.style.animation = "toastIn 0.3s reverse forwards";
-
-
-
-        setTimeout(() => toast.remove(), 300);
-
-
-
-    }, 4000);
-
-
-
+        toast.style.animation = "toastOut 0.25s forwards cubic-bezier(0.175, 0.885, 0.32, 1.275)";
+        setTimeout(() => toast.remove(), 250);
+    }, 2000);
 }
 
 
@@ -5947,6 +5908,11 @@ let selectedSize = null;
 
 
 function openProductDetail(id) {
+    // Fermer proprement tout panneau panier ouvert avant d'ouvrir la fiche produit sur mobile
+    if (typeof elements !== "undefined" && elements) {
+        if (elements.cartSidebar) elements.cartSidebar.classList.remove("open");
+        if (elements.sidebarOverlay) elements.sidebarOverlay.classList.remove("open");
+    }
 
 
 
@@ -6677,13 +6643,29 @@ function addToCart(id, size, openDrawer = true) {
 
 
 function saveCart() {
-
-
-
-    localStorage.setItem("diaw_shoop_cart", JSON.stringify(cart));
-
-
-
+    try {
+        // Optimisation majeure pour mobile : ne JAMAIS dupliquer de lourdes images base64 dans localStorage
+        const lightweightCart = cart.map(item => {
+            const copy = { ...item };
+            if (copy.image && typeof copy.image === "string" && copy.image.startsWith("data:") && copy.image.length > 300) {
+                // Pour éviter l'erreur QuotaExceededError sur mobile (limite 5 Mo de localStorage),
+                // on ne sauvegarde pas l'image brute en base64 dans le panier.
+                // L'image sera ré-associée dynamiquement depuis le catalogue 'products'.
+                copy.image = "";
+            }
+            return copy;
+        });
+        localStorage.setItem("diaw_shoop_cart", JSON.stringify(lightweightCart));
+    } catch (err) {
+        console.warn("Notice: Quota localStorage mobile atteint pour le panier, repli ultra-léger...", err);
+        try {
+            // Repli de secours : ID, taille et quantité uniquement (quelques octets)
+            const minimalCart = cart.map(i => ({ id: String(i.id), size: i.size || null, qty: Number(i.qty || 1) }));
+            localStorage.setItem("diaw_shoop_cart", JSON.stringify(minimalCart));
+        } catch (e) {
+            console.warn("Avertissement: Impossible d'écrire dans localStorage mobile (quota plein)");
+        }
+    }
 }
 
 
@@ -6705,6 +6687,11 @@ function renderCart() {
 
 
     elements.cartBadge.textContent = totalItems;
+    if (elements.cartBadge.classList) {
+        elements.cartBadge.classList.remove("badge-pulse");
+        void elements.cartBadge.offsetWidth;
+        elements.cartBadge.classList.add("badge-pulse");
+    }
 
 
 
@@ -6824,7 +6811,7 @@ function renderCart() {
 
 
 
-            <img src="${escapeHTML(item.image)}" alt="${escapeHTML(item.name)}" class="cart-item-image">
+            <img src="${escapeHTML(item.image || (products.find(p => String(p.id) === String(item.id))?.image) || 'https://placehold.co/400x500?text=Produit')}" alt="${escapeHTML(item.name)}" class="cart-item-image">
 
 
 
@@ -7240,7 +7227,7 @@ function updateDeliveryZoneSelect() {
 
 
 
-    const availableValues = Array.from(select.options).map(o => o.value);
+    const availableValues = Array.from(select.options || []).map(o => o.value);
 
 
 
@@ -8685,6 +8672,13 @@ function finalizeOnlineOrder(transactionId, paymentMethodUsed) {
 
 
     setCheckoutStep(4);
+        if (elements.checkoutModal) {
+            elements.checkoutModal.scrollTop = 0;
+            const modalContent = elements.checkoutModal.querySelector(".modal-content");
+            if (modalContent) modalContent.scrollTop = 0;
+            const modalDialog = elements.checkoutModal.querySelector(".modal-dialog");
+            if (modalDialog) modalDialog.scrollTop = 0;
+        }
 
 
 
@@ -9057,6 +9051,13 @@ function executeSimulatedTransaction(referenceCode) {
 
 
         setCheckoutStep(4);
+        if (elements.checkoutModal) {
+            elements.checkoutModal.scrollTop = 0;
+            const modalContent = elements.checkoutModal.querySelector(".modal-content");
+            if (modalContent) modalContent.scrollTop = 0;
+            const modalDialog = elements.checkoutModal.querySelector(".modal-dialog");
+            if (modalDialog) modalDialog.scrollTop = 0;
+        }
 
 
 
@@ -9121,225 +9122,117 @@ function executeSimulatedTransaction(referenceCode) {
 
 
 function renderInvoiceTicket(order) {
-
-
+    if (!order) return;
+    activeCompletedOrder = order;
 
     let itemsRowsHtml = "";
-
-
-
-    order.items.forEach(it => {
-
-
-
-        const displaySize = it.size === "U" ? "" : ` (${it.size})`;
-
-
-
+    (order.items || []).forEach(it => {
+        const displaySize = (!it.size || it.size === "U" || it.size === "none") ? "" : ` (${it.size})`;
         itemsRowsHtml += `
-
-
-
             <div class="invoice-row">
-
-
-
-                <span>${escapeHTML(it.name)}${displaySize} x${it.qty}</span>
-
-
-
-                <span>${(it.price * it.qty).toLocaleString("fr-FR")} F</span>
-
-
-
+                <span><strong>${escapeHTML(it.name)}</strong>${displaySize} x${it.qty}</span>
+                <span>${(Number(it.price) * it.qty).toLocaleString("fr-FR")} F</span>
             </div>
-
-
-
         `;
-
-
-
     });
 
-
-
-
-
-
-
-    elements.invoiceReceiptDetails.innerHTML = `
-
-
-
-        <div class="invoice-title">TICKET DE COMMANDE</div>
-
-
-
-        <div class="invoice-row">
-
-
-
-            <span><strong>N° Commande :</strong></span>
-
-
-
-            <span>${order.id}</span>
-
-
-
-        </div>
-
-
-
-        <div class="invoice-row">
-
-
-
-            <span><strong>Date :</strong></span>
-
-
-
-            <span>${order.date}</span>
-
-
-
-        </div>
-
-
-
-        <div class="invoice-row divider">
-
-
-
-            <span><strong>Transaction :</strong></span>
-
-
-
-            <span style="color: var(--accent-dark); font-weight:bold;">${order.reference}</span>
-
-
-
-        </div>
-
-
-
-        
-
-
-
-        <div class="invoice-row">
-
-
-
-            <span><strong>Destinataire :</strong></span>
-
-
-
-            <span>${escapeHTML(order.clientName)}</span>
-
-
-
-        </div>
-
-
-
-        <div class="invoice-row">
-
-
-
-            <span><strong>Téléphone :</strong></span>
-
-
-
-            <span>+221 ${escapeHTML(order.clientPhone)}</span>
-
-
-
-        </div>
-
-
-
-        <div class="invoice-row divider">
-
-
-
-            <span><strong>Adresse :</strong></span>
-
-
-
-            <span>${escapeHTML(order.clientAddress)}</span>
-
-
-
-        </div>
-
-
-
-        
-
-
-
-        ${itemsRowsHtml}
-
-
-
-        
-
-
-
-        <div class="invoice-row divider" style="margin-top: 10px;">
-
-
-
-            <span>Frais de livraison (${order.shippingCost === 0 ? 'Offert' : 'Standard'}) :</span>
-
-
-
-            <span>${order.shippingCost.toLocaleString("fr-FR")} F</span>
-
-
-
-        </div>
-
-
-
-        <div class="invoice-row total">
-
-
-
-            <span>TOTAL À RÉGLER À LA LIVRAISON :</span>
-
-
-
-            <span>${order.total.toLocaleString("fr-FR")} FCFA</span>
-
-
-
-        </div>
-
-
-
-        <div class="invoice-row" style="margin-top: 10px; font-size: 0.75rem; color: var(--text-muted);">
-
-
-
-            <span>Règlement : ${order.paymentMethod}</span>
-
-
-
-            <span>Statut : ${order.status}</span>
-
-
-
-        </div>
-
-
-
-    `;
-
-
-
+    const shopSettings = JSON.parse(localStorage.getItem("diaw_shoop_settings")) || { whatsapp: "221705476061", shopName: "DIAW SHOOP" };
+    const waPhone = shopSettings.whatsapp || "221705476061";
+    const shopName = (shopSettings.shopName || "DIAW SHOOP").trim();
+    const shopLogo = shopSettings.shopLogo || "assets/logo_diaw_shoop.jpg";
+    const shopLogoHeaderHtml = `
+            <div style="text-align:center; margin-bottom:14px; padding-bottom:10px; border-bottom:1px dashed var(--border-color);">
+                <img src="${escapeHTML(shopLogo)}" alt="${escapeHTML(shopName)}" style="max-height:55px; max-width:180px; object-fit:contain; margin:0 auto 8px auto; display:block;" onerror="this.style.display='none'">
+                <div style="font-size:1.25rem; color:var(--primary); font-family:var(--font-header); font-weight:800; letter-spacing:0.04em;">${escapeHTML(shopName)}</div>
+            </div>`;
+    
+    // Message WhatsApp officiel prérempli
+    const waText = encodeURIComponent(
+        `Bonjour ${shopName} ! Je viens de valider ma commande #${order.id}.
+
+` +
+        `- *Destinataire* : ${order.clientName}
+` +
+        `- *Téléphone* : +221 ${order.clientPhone}
+` +
+        `- *Adresse* : ${order.clientAddress}
+` +
+        `- *Montant à régler* : ${Number(order.total).toLocaleString("fr-FR")} FCFA
+
+` +
+        `Merci de me confirmer la livraison de mon colis !`
+    );
+    const waUrl = `https://wa.me/${waPhone}?text=${waText}`;
+
+    if (elements.invoiceReceiptDetails) {
+        elements.invoiceReceiptDetails.innerHTML = `
+            <div style="background: rgba(34, 197, 94, 0.1); border: 1.5px solid #22c55e; border-radius: 8px; padding: 12px; margin-bottom: 18px; text-align: center;">
+                <div style="font-size: 1.25rem; color: #16a34a; font-weight: 800; margin-bottom: 4px;"><i class="fa-solid fa-circle-check"></i> COMMANDE CONFIRMÉE</div>
+                <div style="font-size: 0.85rem; color: var(--text-color);">Votre commande a bien été enregistrée et transmise à notre service de livraison.</div>
+            </div>
+
+            ${shopLogoHeaderHtml}
+
+            <div class="invoice-title" style="letter-spacing:1px; margin-bottom:14px; font-weight:700;">REÇU OFFICIEL DE COMMANDE</div>
+
+            <div class="invoice-row">
+                <span><strong>N° de Commande :</strong></span>
+                <span style="font-size:1.1rem; font-weight:800; color:var(--accent-dark);">#${order.id}</span>
+            </div>
+            <div class="invoice-row">
+                <span><strong>Date & Heure :</strong></span>
+                <span>${order.date}</span>
+            </div>
+            <div class="invoice-row divider">
+                <span><strong>Transaction :</strong></span>
+                <span style="font-family:monospace; font-weight:700; color:var(--primary);">${order.reference || order.id}</span>
+            </div>
+            
+            <div class="invoice-row">
+                <span><strong>Destinataire :</strong></span>
+                <span>${escapeHTML(order.clientName)}</span>
+            </div>
+            <div class="invoice-row">
+                <span><strong>Téléphone :</strong></span>
+                <span>+221 ${escapeHTML(order.clientPhone)}</span>
+            </div>
+            <div class="invoice-row divider">
+                <span><strong>Adresse de livraison :</strong></span>
+                <span>${escapeHTML(order.clientAddress)}</span>
+            </div>
+            ${order.notes ? `
+            <div class="invoice-row divider">
+                <span><strong>Instructions :</strong></span>
+                <span style="font-style: italic;">${escapeHTML(order.notes)}</span>
+            </div>` : ''}
+
+            <div style="margin: 12px 0 8px 0; font-weight: 700; font-size: 0.85rem; color: var(--primary); text-transform: uppercase;">Articles commandés :</div>
+            ${itemsRowsHtml}
+
+            <div class="invoice-row divider" style="margin-top: 14px;">
+                <span>Frais de livraison (${(order.shippingCost || 0) === 0 ? 'Offerts' : 'Standard'}) :</span>
+                <span>${(order.shippingCost || 0) === 0 ? 'GRATUIT' : (order.shippingCost || 0).toLocaleString("fr-FR") + ' F'}</span>
+            </div>
+            <div class="invoice-row total" style="background: rgba(212, 175, 55, 0.12); padding: 12px; border-radius: 6px; margin: 12px 0;">
+                <span style="font-size: 1.05rem; font-weight: 800;">TOTAL À RÉGLER AU LIVREUR :</span>
+                <span style="font-size: 1.25rem; font-weight: 800; color: var(--accent-dark);">${Number(order.total).toLocaleString("fr-FR")} FCFA</span>
+            </div>
+            <div class="invoice-row" style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 18px;">
+                <span>Règlement : ${order.paymentMethod}</span>
+                <span style="color:#16a34a; font-weight:600;"><i class="fa-solid fa-truck-fast"></i> En cours de préparation</span>
+            </div>
+
+            <!-- BOUTON WHATSAPP DIRECT DU REÇU -->
+            <a href="${waUrl}" target="_blank" class="btn btn-whatsapp btn-block" style="display:flex; align-items:center; justify-content:center; gap:8px; padding:12px; font-weight:700; margin-bottom:10px; border-radius:8px;">
+                <i class="fa-brands fa-whatsapp" style="font-size:1.25rem;"></i> Recevoir mon reçu sur WhatsApp
+            </a>
+
+            <!-- BOUTON VOIR REÇU GRAND FORMAT / IMPRIMER -->
+            <button type="button" class="btn btn-outline-primary btn-block" onclick="viewOrderInvoiceModal('${order.id}')" style="display:flex; align-items:center; justify-content:center; gap:8px; padding:10px; font-weight:600; border-radius:8px;">
+                <i class="fa-solid fa-file-invoice"></i> Voir le reçu officiel grand format / Imprimer
+            </button>
+        `;
+    }
 }
 
 
@@ -9404,18 +9297,12 @@ function downloadOrderReceiptPdf(order) {
 
 
 
+        const receiptSettings = JSON.parse(localStorage.getItem("diaw_shoop_settings")) || {};
+        const activeShopName = (receiptSettings.shopName || "DIAW SHOOP").trim();
+        const activeShopPhone = receiptSettings.whatsapp ? '+221 ' + receiptSettings.whatsapp.replace("221", "") : '+221 70 547 60 61';
         const textContent = `================================================
-
-
-
-DIAW SHOOP - REÇU DE COMMANDE OFFICIEL
-
-
-
-Mode Féminine, Robes & Abayas Sénégal
-
-
-
+${activeShopName.toUpperCase()} - REÇU DE COMMANDE OFFICIEL
+${receiptSettings.address || 'Mode Féminine & Produits Sénégal'}
 ================================================
 
 
@@ -9500,11 +9387,9 @@ TOTAL À RÉGLER : ${order.total.toLocaleString('fr-FR')} FCFA
 
 
 
-Service Client DIAW SHOOP : +221 78 594 64 27
+Service Client ${activeShopName} : ${activeShopPhone}
 
-
-
-Merci de votre achat chez DIAW SHOOP !
+Merci de votre achat chez ${activeShopName} !
 
 
 
@@ -10100,335 +9985,85 @@ if (btnGuestSkipAccount) {
 
 
 
-elements.btnMyOrders.addEventListener("click", (e) => {
-
-
-
-    e.preventDefault();
-
-
-
-    if (!currentUser) return;
-
-
-
-
-
-
-
-    const userEmail = (currentUser.email || "").toLowerCase();
-
-
-
-    const userName = (currentUser.name || "").toLowerCase();
-
-
-
-    const clientOrders = orders.filter(o => 
-
-
-
-        (o.clientEmail && o.clientEmail.toLowerCase() === userEmail) ||
-
-
-
-        (userName && o.clientName && o.clientName.toLowerCase() === userName)
-
-
-
-    );
-
-
-
-    elements.myOrdersList.innerHTML = "";
-
-
-
-
-
-
-
-    if (clientOrders.length === 0) {
-
-
-
-        elements.myOrdersList.innerHTML = `
-
-
-
-            <div style="text-align:center; padding: 40px; color: var(--text-muted)">
-
-
-
-                <i class="fa-solid fa-bag-shopping" style="font-size: 2.5rem; margin-bottom:15px; color: var(--accent);"></i>
-
-
-
-                <p style="font-size: 1rem; margin-bottom: 8px;">Vous n'avez pas encore passé de commande sur notre boutique.</p>
-
-
-
-                <p style="font-size: 0.85rem;">Parcourez notre collection et découvrez nos nouveautés !</p>
-
-
-
-            </div>
-
-
-
-        `;
-
-
-
-    } else {
-
-
-
-        clientOrders.forEach(o => {
-
-
-
-            let itemDetails = o.items.map(it => it.size === "U" ? `${escapeHTML(it.name)} x${it.qty}` : `${escapeHTML(it.name)} (${it.size}) x${it.qty}`).join(", ");
-
-
-
-            
-
-
-
-            // Calcul de l'étape active dans la barre de progression (1: Confirmée, 2: Préparation, 3: En livraison, 4: Livrée)
-
-
-
-            let currentStep = 1;
-
-
-
-            if (o.status.includes("préparation")) currentStep = 2;
-
-
-
-            else if (o.status.includes("livraison")) currentStep = 3;
-
-
-
-            else if (o.status.includes("Livré")) currentStep = 4;
-
-
-
-
-
-
-
-            const card = document.createElement("div");
-
-
-
-            card.className = "customer-order-card";
-
-
-
-            card.innerHTML = `
-
-
-
-                <div class="customer-order-header">
-
-
-
-                    <div>
-
-
-
-                        <strong>Commande #${o.id}</strong>
-
-
-
-                        <div class="text-muted" style="font-size:0.75rem;"><i class="fa-regular fa-calendar"></i> ${o.date}</div>
-
-
-
-                    </div>
-
-
-
-                    <span class="badge ${currentStep === 4 ? 'badge-success' : (currentStep >= 2 ? 'badge-accent' : 'badge-primary')}">${escapeHTML(o.status)}</span>
-
-
-
-                </div>
-
-
-
-
-
-
-
-                <!-- Timeline stepper -->
-
-
-
-                <div class="order-timeline">
-
-
-
-                    <div class="timeline-step ${currentStep >= 1 ? (currentStep > 1 ? 'completed' : 'current') : ''}">
-
-
-
-                        <div class="step-bubble">${currentStep > 1 ? '<i class="fa-solid fa-check"></i>' : '1'}</div>
-
-
-
-                        <span class="step-name">Confirmée</span>
-
-
-
-                    </div>
-
-
-
-                    <div class="timeline-step ${currentStep >= 2 ? (currentStep > 2 ? 'completed' : 'current') : ''}">
-
-
-
-                        <div class="step-bubble">${currentStep > 2 ? '<i class="fa-solid fa-check"></i>' : '2'}</div>
-
-
-
-                        <span class="step-name">Préparation</span>
-
-
-
-                    </div>
-
-
-
-                    <div class="timeline-step ${currentStep >= 3 ? (currentStep > 3 ? 'completed' : 'current') : ''}">
-
-
-
-                        <div class="step-bubble">${currentStep > 3 ? '<i class="fa-solid fa-check"></i>' : '3'}</div>
-
-
-
-                        <span class="step-name">En livraison</span>
-
-
-
-                    </div>
-
-
-
-                    <div class="timeline-step ${currentStep >= 4 ? 'completed current' : ''}">
-
-
-
-                        <div class="step-bubble">${currentStep >= 4 ? '<i class="fa-solid fa-check"></i>' : '4'}</div>
-
-
-
-                        <span class="step-name">Livrée</span>
-
-
-
-                    </div>
-
-
-
-                </div>
-
-
-
-
-
-
-
-                <div style="font-size: 0.85rem; color: var(--text-muted); background: var(--bg-input); padding: 10px; border-radius: 6px; margin-bottom: 12px;">
-
-
-
-                    <p style="margin-bottom: 4px;"><strong>Articles :</strong> ${itemDetails}</p>
-
-
-
-                    <p style="margin-bottom: 0;"><strong>Adresse :</strong> ${escapeHTML(o.clientAddress)}</p>
-
-
-
-                </div>
-
-
-
-
-
-
-
-                <div class="order-card-footer" style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
-
-
-
-                    <div>
-
-
-
-                        <span class="text-muted" style="font-size:0.8rem;">Total réglé :</span>
-
-
-
-                        <strong style="color:var(--primary); font-size:1.1rem; margin-left: 6px;">${o.total.toLocaleString("fr-FR")} F</strong>
-
-
-
-                    </div>
-
-
-
-                    <div style="display:flex; gap:8px;">
-
-
-
-                        <button type="button" class="btn btn-sm btn-secondary" onclick="viewOrderInvoiceModal('${o.id}')"><i class="fa-solid fa-receipt"></i> Voir le reçu</button>
-
-
-
-                        <a href="https://wa.me/${SELLER_WHATSAPP}?text=${encodeURIComponent('Bonjour Diaw Shoop, je me renseigne sur ma commande #' + o.id)}" target="_blank" class="btn btn-sm" style="background:#25d366; color:white;"><i class="fa-brands fa-whatsapp"></i> Aide</a>
-
-
-
-                    </div>
-
-
-
-                </div>
-
-
-
-            `;
-
-
-
-            elements.myOrdersList.appendChild(card);
-
-
-
-        });
-
-
-
+window.openMyOrdersModal = function () {
+    let clientOrders = [];
+    if (currentUser) {
+        const userEmail = (currentUser.email || "").toLowerCase();
+        const userName = (currentUser.name || "").toLowerCase();
+        clientOrders = orders.filter(o => 
+            (o.clientEmail && o.clientEmail.toLowerCase() === userEmail) ||
+            (userName && o.clientName && o.clientName.toLowerCase() === userName)
+        );
+    }
+    // Si aucun ordre trouvé via le compte ou en mode invité, récupérer toutes les commandes de cet appareil
+    if (clientOrders.length === 0 && orders && orders.length > 0) {
+        clientOrders = [...orders];
     }
 
+    if (elements.myOrdersList) {
+        elements.myOrdersList.innerHTML = "";
 
+        if (clientOrders.length === 0) {
+            elements.myOrdersList.innerHTML = `
+                <div style="text-align:center; padding: 40px; color: var(--text-muted)">
+                    <i class="fa-solid fa-receipt" style="font-size: 2.8rem; margin-bottom:15px; color: var(--accent);"></i>
+                    <h3 style="font-size: 1.15rem; margin-bottom: 8px; color: var(--primary);">Aucun reçu pour le moment</h3>
+                    <p style="font-size: 0.9rem;">Vos reçus de commande apparaîtront automatiquement ici dès votre premier achat !</p>
+                </div>
+            `;
+        } else {
+            clientOrders.forEach(o => {
+                const card = document.createElement("div");
+                card.className = "my-order-card";
+                card.style.cssText = "background: #fff; border: 1px solid var(--border-color); border-radius: 10px; padding: 16px; margin-bottom: 14px; box-shadow: var(--shadow-sm);";
+                
+                const itemsCount = (o.items || []).reduce((sum, it) => sum + (it.qty || 1), 0);
+                const itemsNames = (o.items || []).map(it => it.name).join(", ");
+                
+                card.innerHTML = `
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1px solid var(--border-color); padding-bottom:8px;">
+                        <div>
+                            <strong style="color:var(--accent-dark); font-size:1.05rem;">#${o.id}</strong>
+                            <div style="font-size:0.8rem; color:var(--text-muted);">${o.date}</div>
+                        </div>
+                        <span class="status-badge" style="background:rgba(34,197,94,0.15); color:#16a34a; font-weight:700; padding:4px 10px; border-radius:20px; font-size:0.8rem;">
+                            <i class="fa-solid fa-check"></i> ${escapeHTML(o.status || 'Validée')}
+                        </span>
+                    </div>
+                    <div style="font-size:0.88rem; margin-bottom:8px;">
+                        <strong>Articles (${itemsCount}) :</strong> <span style="color:var(--text-color);">${escapeHTML(itemsNames)}</span>
+                    </div>
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
+                        <div>
+                            <span style="font-size:0.82rem; color:var(--text-muted);">Total :</span>
+                            <strong style="font-size:1.1rem; color:var(--primary); margin-left:4px;">${Number(o.total).toLocaleString("fr-FR")} FCFA</strong>
+                        </div>
+                        <button type="button" class="btn btn-primary btn-sm" onclick="viewOrderInvoiceModal('${o.id}')" style="display:flex; align-items:center; gap:6px; padding:8px 14px; font-size:0.85rem; border-radius:6px;">
+                            <i class="fa-solid fa-receipt"></i> Voir le reçu
+                        </button>
+                    </div>
+                `;
+                elements.myOrdersList.appendChild(card);
+            });
+        }
+    }
 
+    if (elements.myOrdersModal) {
+        elements.myOrdersModal.classList.add("open");
+    }
+};
 
+if (elements.btnMyOrders) {
+    elements.btnMyOrders.addEventListener("click", (e) => {
+        e.preventDefault();
+        window.openMyOrdersModal();
+    });
+}
 
-
-
-    elements.myOrdersModal.classList.add("open");
-
-
-
-});
+const headerOrdersBtn = document.getElementById("header-orders-trigger");
+if (headerOrdersBtn) {
+    headerOrdersBtn.addEventListener("click", () => window.openMyOrdersModal());
+}
 
 
 
@@ -13227,6 +12862,19 @@ window.viewOrderInvoiceModal = function (orderId) {
 
     if (!modalDetails || !modal) return;
 
+    const modalSettings = JSON.parse(localStorage.getItem("diaw_shoop_settings")) || {};
+    const currentShopName = (modalSettings.shopName || "DIAW SHOOP").trim();
+    const currentShopLogo = modalSettings.shopLogo || "assets/logo_diaw_shoop.jpg";
+    const modalLogoImg = document.getElementById("modal-invoice-shop-logo");
+    if (modalLogoImg) {
+        modalLogoImg.src = currentShopLogo;
+        modalLogoImg.style.display = "block";
+    }
+    const modalShopTitle = document.getElementById("modal-invoice-shop-name");
+    if (modalShopTitle) {
+        modalShopTitle.textContent = currentShopName;
+    }
+
 
 
 
@@ -14364,6 +14012,17 @@ function applyStoreSettings() {
 
 
     };
+    // Invoice Modal Logo & Name
+    const modalInvoiceLogo = document.getElementById("modal-invoice-shop-logo");
+    if (modalInvoiceLogo) {
+        modalInvoiceLogo.src = logoImgUrl;
+        modalInvoiceLogo.style.display = "block";
+    }
+    const modalInvoiceName = document.getElementById("modal-invoice-shop-name");
+    if (modalInvoiceName) {
+        modalInvoiceName.textContent = logoName;
+    }
+
 
 
 

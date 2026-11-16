@@ -22,7 +22,7 @@
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-    <link rel="stylesheet" href="style.css?v=4">
+    <link rel="stylesheet" href="style.css?v=22">
 
     <!-- Google Identity Services SDK for Real Google Sign-In -->
 
@@ -117,6 +117,11 @@
                 </button>
 
                 <!-- Shopping Cart Icon -->
+
+                <!-- Orders & Receipts Button for all customers -->
+                <button class="header-orders-btn" id="header-orders-trigger" title="Mes Commandes & Reçus" aria-label="Mes Commandes">
+                    <i class="fa-solid fa-receipt"></i>
+                </button>
 
                 <button class="cart-trigger-btn" id="cart-trigger-btn">
 
@@ -2348,7 +2353,8 @@
 
                     <div class="invoice-header-stamp" style="text-align: center; margin-bottom: 20px;">
 
-                        <h2 style="font-size: 1.3rem; margin-bottom: 4px; color: var(--primary);">DIAW SHOOP</h2>
+                        <img id="modal-invoice-shop-logo" src="assets/logo_diaw_shoop.jpg" alt="Logo" style="max-height: 55px; max-width: 180px; object-fit: contain; margin: 0 auto 8px auto; display: block;" onerror="this.style.display='none'">
+                        <h2 id="modal-invoice-shop-name" style="font-size: 1.3rem; margin-bottom: 4px; color: var(--primary);">DIAW SHOOP</h2>
 
                         <p class="text-muted" style="font-size: 0.85rem;">Bordereau & Facture de Livraison</p>
 
@@ -2629,7 +2635,7 @@
     </div>
 
     <!-- Local Application Javascript -->
-    <script src="app.js?v=19"></script>
+    <script src="app.js?v=22"></script>
 
 </body>
 
