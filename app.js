@@ -7696,53 +7696,53 @@ elements.btnCloseCheckoutModal.addEventListener("click", () => {
 
 
 function setCheckoutStep(stepNumber) {
-
-
-
-    document.querySelectorAll(".checkout-step-content").forEach(el => el.classList.remove("active"));
-
-
-
+    document.querySelectorAll(".checkout-step-content").forEach(el => {
+        el.classList.remove("active");
+        el.style.display = "none";
+    });
     document.querySelectorAll(".checkout-steps .step").forEach((el, index) => {
-
-
-
         el.classList.remove("active", "completed");
-
-
-
         if (index + 1 === stepNumber) {
-
-
-
             el.classList.add("active");
-
-
-
         } else if (index + 1 < stepNumber) {
-
-
-
             el.classList.add("completed");
-
-
-
         }
-
-
-
     });
 
+    const currentStepEl = document.getElementById(`checkout-step-${stepNumber}`);
+    if (currentStepEl) {
+        currentStepEl.classList.add("active");
+        currentStepEl.style.display = "block";
+    }
 
+    // Protection dédiée pour l'étape 3 (Confirmation commande à la livraison)
+    if (stepNumber === 3) {
+        const wizardCash = document.getElementById("wizard-cash");
+        if (wizardCash) wizardCash.style.display = "block";
 
+        const simNav = document.getElementById("sim-nav-buttons");
+        if (simNav) simNav.style.display = "flex";
 
+        const loader = document.getElementById("transaction-loader");
+        if (loader) loader.style.display = "none";
 
+        const cashAmountConfirm = document.getElementById("cash-amount-confirm");
+        if (cashAmountConfirm && typeof checkoutDetails !== "undefined" && checkoutDetails) {
+            const confirmedTotal = checkoutDetails.total || 
+                ((checkoutDetails.subtotal || 0) + (checkoutDetails.shippingCost || 0)) ||
+                (cart || []).reduce((sum, it) => sum + (Number(it.price) * (it.qty || 1)), 0);
+            cashAmountConfirm.textContent = `${Number(confirmedTotal).toLocaleString("fr-FR")} FCFA`;
+        }
+    }
 
-
-    document.getElementById(`checkout-step-${stepNumber}`).classList.add("active");
-
-
-
+    // Protection dédiée pour l'étape 4 (Reçu officiel de commande)
+    if (stepNumber === 4 && elements.checkoutModal) {
+        elements.checkoutModal.scrollTop = 0;
+        const modalContent = elements.checkoutModal.querySelector(".modal-content");
+        if (modalContent) modalContent.scrollTop = 0;
+        const modalDialog = elements.checkoutModal.querySelector(".modal-dialog");
+        if (modalDialog) modalDialog.scrollTop = 0;
+    }
 }
 
 
@@ -7956,57 +7956,21 @@ elements.btnBackToStep2.addEventListener("click", () => {
 
 
 elements.btnProceedToSim.addEventListener("click", () => {
-
-
-
     selectedPaymentMethod = "cash";
-
-
-
     checkoutDetails.paymentMethod = "cash";
 
-
-
-
-
-
-
-    setCheckoutStep(3);
-
-
-
-    document.querySelectorAll(".payment-wizard").forEach(w => w.style.display = "none");
-
-
-
-
-
-
-
-    const wizardCash = document.getElementById("wizard-cash");
-
-
-
-    if (wizardCash) wizardCash.style.display = "block";
-
-
-
-    const cashAmountConfirm = document.getElementById("cash-amount-confirm");
-
-
-
-    if (cashAmountConfirm) {
-
-
-
-        cashAmountConfirm.textContent = `${checkoutDetails.total.toLocaleString("fr-FR")} FCFA`;
-
-
-
+    // Re-synchronisation de sécurité des articles et du montant total
+    if (!checkoutDetails.items || checkoutDetails.items.length === 0) {
+        checkoutDetails.items = [...(cart || [])];
+    }
+    if (!checkoutDetails.total || checkoutDetails.total === 0) {
+        const sub = (checkoutDetails.items || []).reduce((sum, it) => sum + (Number(it.price) * (it.qty || 1)), 0);
+        checkoutDetails.subtotal = sub;
+        checkoutDetails.shippingCost = checkoutDetails.shippingCost || 0;
+        checkoutDetails.total = sub + checkoutDetails.shippingCost;
     }
 
-
-
+    setCheckoutStep(3);
 });
 
 
@@ -8780,356 +8744,144 @@ if (btnCashConfirmOrder) {
 
 
 function executeSimulatedTransaction(referenceCode) {
-
-
-
-    // Hide wizard options and actions
-
-
-
-    document.querySelectorAll(".payment-wizard").forEach(w => w.style.display = "none");
-
-
-
-    elements.simNavButtons.style.display = "none";
-
-
-
-    elements.transactionLoader.style.display = "flex";
-
-
-
-
-
-
-
-    // Simulate transaction delay
-
-
+    const wizardCash = document.getElementById("wizard-cash");
+    if (wizardCash) wizardCash.style.display = "none";
+    if (elements.simNavButtons) elements.simNavButtons.style.display = "none";
+    if (elements.transactionLoader) elements.transactionLoader.style.display = "flex";
 
     setTimeout(() => {
-
-
-
-        elements.transactionLoader.style.display = "none";
-
-
-
-
-
-
-
-        // 1. Create Order object
-
-
-
-        const orderId = "DS-" + Math.floor(100000 + Math.random() * 900000);
-
-
-
-        const orderDate = new Date().toLocaleString("fr-FR");
-
-
-
-        const clientEmail = currentUser ? currentUser.email : (checkoutDetails.email || `${checkoutDetails.phone}@guest.diawshoop.sn`);
-
-
-
-
-
-
-
-        const newOrder = {
-
-
-
-            id: orderId,
-
-
-
-            date: orderDate,
-
-
-
-            userId: currentUser ? (currentUser.id || currentUser.email) : null,
-            clientEmail: clientEmail || (currentUser ? currentUser.email : ""),
-
-
-
-            clientName: checkoutDetails.name,
-
-
-
-            clientPhone: checkoutDetails.phone,
-
-
-
-            clientAddress: checkoutDetails.address,
-
-
-
-            notes: checkoutDetails.notes,
-
-
-
-            items: checkoutDetails.items,
-
-
-
-            subtotal: checkoutDetails.subtotal,
-
-
-
-            shippingCost: checkoutDetails.shippingCost,
-
-
-
-            total: checkoutDetails.total,
-
-
-
-            paymentMethod: "Paiement à la livraison",
-
-
-
-            reference: referenceCode,
-
-
-
-            status: "Reçue (Paiement à la livraison)"
-
-
-
-        };
-
-
-
-
-
-
-
-        activeCompletedOrder = newOrder;
-
-
-
-
-
-
-
-        // 2. Decrement physical inventory stock
-
-
-
-        checkoutDetails.items.forEach(cartItem => {
-
-
-
-            const p = products.find(prod => prod.id === cartItem.id);
-
-
-
-            const targetSize = (cartItem.size && cartItem.size !== "U" && cartItem.size !== "none") ? cartItem.size : "S";
-
-
-
-            if (p && p.stocks && p.stocks[targetSize]) {
-
-
-
-                p.stocks[targetSize] = Math.max(0, p.stocks[targetSize] - cartItem.qty);
-
-
-
+        let createdOrder = null;
+
+        try {
+            if (elements.transactionLoader) elements.transactionLoader.style.display = "none";
+
+            // 1. Create Order object
+            const orderId = "DS-" + Math.floor(100000 + Math.random() * 900000);
+            const orderDate = new Date().toLocaleString("fr-FR");
+            const clientEmail = currentUser ? currentUser.email : (checkoutDetails.email || `${checkoutDetails.phone || 'client'}@guest.diawshoop.sn`);
+
+            const orderItems = (checkoutDetails.items && checkoutDetails.items.length > 0) ? checkoutDetails.items : [...(cart || [])];
+            const orderSubtotal = checkoutDetails.subtotal || orderItems.reduce((sum, it) => sum + (Number(it.price) * (it.qty || 1)), 0);
+            const orderShipping = checkoutDetails.shippingCost || 0;
+            const orderTotal = checkoutDetails.total || (orderSubtotal + orderShipping);
+
+            createdOrder = {
+                id: orderId,
+                date: orderDate,
+                userId: currentUser ? (currentUser.id || currentUser.email) : null,
+                clientEmail: clientEmail || (currentUser ? currentUser.email : ""),
+                clientName: checkoutDetails.name || "Client",
+                clientPhone: checkoutDetails.phone || "",
+                clientAddress: checkoutDetails.address || "",
+                notes: checkoutDetails.notes || "",
+                items: orderItems,
+                subtotal: orderSubtotal,
+                shippingCost: orderShipping,
+                total: orderTotal,
+                paymentMethod: "Paiement à la livraison",
+                reference: referenceCode,
+                status: "Reçue (Paiement à la livraison)"
+            };
+
+            activeCompletedOrder = createdOrder;
+
+            // 2. Decrement physical inventory stock safely
+            try {
+                (orderItems || []).forEach(cartItem => {
+                    const p = products.find(prod => prod.id === cartItem.id);
+                    const targetSize = (cartItem.size && cartItem.size !== "U" && cartItem.size !== "none") ? cartItem.size : "S";
+                    if (p && p.stocks && p.stocks[targetSize]) {
+                        p.stocks[targetSize] = Math.max(0, p.stocks[targetSize] - (cartItem.qty || 1));
+                    }
+                });
+                localStorage.setItem("diaw_shoop_products", JSON.stringify(products));
+            } catch (stockErr) {
+                console.warn("Stock update notice:", stockErr);
             }
 
+            try {
+                renderProductList();
+            } catch (renderErr) {
+                console.warn("Product render notice:", renderErr);
+            }
 
+            // 3. Save order locally
+            try {
+                orders.unshift(createdOrder);
+                localStorage.setItem("diaw_shoop_orders", JSON.stringify(orders));
+            } catch (storageErr) {
+                console.warn("Orders local storage notice:", storageErr);
+            }
 
-        });
+            // Save in Supabase Cloud
+            if (supabaseClient && typeof db !== "undefined" && db.createOrder) {
+                db.createOrder({
+                    reference: createdOrder.reference || createdOrder.id,
+                    customer_name: createdOrder.clientName,
+                    customer_email: createdOrder.clientEmail,
+                    customer_phone: createdOrder.clientPhone,
+                    total_amount: createdOrder.total,
+                    status: createdOrder.status,
+                    items: createdOrder.items,
+                    shipping_address: createdOrder.clientAddress
+                }).catch(err => console.warn("Supabase order creation notice:", err));
+            }
 
+            // 4. Generate invoice receipt ticket
+            renderInvoiceTicket(createdOrder);
 
+            // 5. Clear cart
+            try {
+                cart = [];
+                saveCart();
+                renderCart();
+            } catch (cartErr) {
+                console.warn("Cart reset notice:", cartErr);
+            }
 
-        localStorage.setItem("diaw_shoop_products", JSON.stringify(products));
+        } catch (mainOrderErr) {
+            console.error("Order completion error:", mainOrderErr);
+            if (!createdOrder) {
+                createdOrder = {
+                    id: "DS-" + Math.floor(100000 + Math.random() * 900000),
+                    date: new Date().toLocaleString("fr-FR"),
+                    clientName: checkoutDetails.name || "Client",
+                    clientPhone: checkoutDetails.phone || "",
+                    clientAddress: checkoutDetails.address || "",
+                    items: checkoutDetails.items || [...(cart || [])],
+                    total: checkoutDetails.total || 0,
+                    paymentMethod: "Paiement à la livraison",
+                    status: "Reçue (Paiement à la livraison)"
+                };
+            }
+            try {
+                renderInvoiceTicket(createdOrder);
+            } catch (fallbackErr) {
+                console.error("Receipt fallback error:", fallbackErr);
+            }
+        } finally {
+            if (elements.transactionLoader) elements.transactionLoader.style.display = "none";
+            // Guarantee user ALWAYS lands on Step 4 (Receipt)
+            setCheckoutStep(4);
+            if (elements.checkoutModal) {
+                elements.checkoutModal.scrollTop = 0;
+                const modalContent = elements.checkoutModal.querySelector(".modal-content");
+                if (modalContent) modalContent.scrollTop = 0;
+                const modalDialog = elements.checkoutModal.querySelector(".modal-dialog");
+                if (modalDialog) modalDialog.scrollTop = 0;
+            }
+            showToast("Votre commande a été validée avec succès !");
 
-
-
-        renderProductList(); // Refresh main view
-
-
-
-
-
-
-
-        // 3. Save order locally & in Supabase
-
-
-
-        orders.unshift(newOrder);
-
-
-
-        localStorage.setItem("diaw_shoop_orders", JSON.stringify(orders));
-
-
-
-        if (supabaseClient) {
-
-
-
-            db.createOrder({
-
-
-
-                reference: newOrder.reference || newOrder.id,
-
-
-
-                customer_name: newOrder.clientName,
-
-
-
-                customer_email: newOrder.clientEmail,
-
-
-
-                customer_phone: newOrder.clientPhone,
-
-
-
-                total_amount: newOrder.total,
-
-
-
-                status: newOrder.status,
-
-
-
-                items: newOrder.items,
-
-
-
-                shipping_address: newOrder.clientAddress
-
-
-
-            });
-
-
-
+            const guestPrompt = document.getElementById("guest-signup-prompt");
+            if (guestPrompt) {
+                guestPrompt.style.display = !currentUser ? "block" : "none";
+            }
+            if (currentUser && currentUser.isAdmin) {
+                try { renderAdminDashboard(); } catch(e){}
+            }
         }
-
-
-
-
-
-
-
-        // 4. Generate invoice receipt ticket
-
-
-
-        renderInvoiceTicket(newOrder);
-
-
-
-
-
-
-
-        // 5. Clear cart
-
-
-
-        cart = [];
-
-
-
-        saveCart();
-
-
-
-        renderCart();
-
-
-
-
-
-
-
-        // 6. Go to final receipt step
-
-
-
-        setCheckoutStep(4);
-        if (elements.checkoutModal) {
-            elements.checkoutModal.scrollTop = 0;
-            const modalContent = elements.checkoutModal.querySelector(".modal-content");
-            if (modalContent) modalContent.scrollTop = 0;
-            const modalDialog = elements.checkoutModal.querySelector(".modal-dialog");
-            if (modalDialog) modalDialog.scrollTop = 0;
-        }
-
-
-
-        showToast("Votre commande a été validée avec succès !");
-
-
-
-
-
-
-
-        // Show guest signup prompt if customer is not logged in
-
-
-
-        const guestPrompt = document.getElementById("guest-signup-prompt");
-
-
-
-        if (guestPrompt) {
-
-
-
-            guestPrompt.style.display = !currentUser ? "block" : "none";
-
-
-
-        }
-
-
-
-
-
-
-
-        // Refresh admin if logged in
-
-
-
-        if (currentUser && currentUser.isAdmin) {
-
-
-
-            renderAdminDashboard();
-
-
-
-        }
-
-
-
-    }, 2500);
-
-
-
+    }, 800);
 }
-
-
-
-
-
-
 
 function renderInvoiceTicket(order) {
     if (!order) return;

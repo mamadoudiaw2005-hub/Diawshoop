@@ -1381,7 +1381,7 @@ img {
     display: none;
 }
 .checkout-step-content.active {
-    display: block;
+    display: block !important;
 }
 
 /* Payment selection grid */
