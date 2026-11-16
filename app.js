@@ -3525,6 +3525,12 @@ function updateUserUI() {
 
 
             elements.userRoleBadge.textContent = currentUser.isSuperAdmin ? "Grand Admin" : "Admin Secondaire";
+            if ("Notification" in window && Notification.permission === "default") {
+                try { Notification.requestPermission(); } catch (e) {}
+            }
+            if (elements.btnMyOrders) {
+                elements.btnMyOrders.innerHTML = '<i class="fa-solid fa-receipt"></i> Historique des Commandes';
+            }
 
 
 
@@ -5228,8 +5234,11 @@ function subscribeToProductUpdates() {
 
 
             .on('postgres_changes', { event: '*', schema: 'public', table: 'diawshoop_orders' }, (payload) => {
-                console.log("Nouvelle commande reçue en temps réel sur diawshoop_orders :", payload);
+                console.log("Événement commande reçu en temps réel sur diawshoop_orders :", payload);
                 if (currentUser && currentUser.isAdmin) {
+                    if (payload.eventType === 'INSERT' || (payload.new && !orders.some(o => (o.supabaseId && o.supabaseId === payload.new.id) || o.reference === payload.new.reference))) {
+                        notifyAdminNewOrder(payload.new || {});
+                    }
                     loadOrdersFromSupabase();
                 }
             })
@@ -6615,7 +6624,7 @@ elements.modalBtnAddCart.addEventListener("click", () => {
     elements.productDetailModal.classList.remove("open");
     
     // Ajouter au panier ET ouvrir immédiatement le tiroir du panier pour une confirmation claire
-    addToCart(currentDetailProduct.id, finalSize, true);
+    addToCart(currentDetailProduct.id, finalSize, false);
 });
 
 // WhatsApp Direct Purchase order (Senegal specific conversion optimization)
@@ -6652,7 +6661,7 @@ function quickAddToCart(productId) {
 
     // Si le produit est en taille unique (Abayas, voiles, soins, parfums...)
     if (!productRequiresSize(prod)) {
-        addToCart(productId, "U", true);
+        addToCart(productId, "U", false);
         return;
     }
 
@@ -6667,7 +6676,7 @@ function quickAddToCart(productId) {
     }
 
     if (sizeFound) {
-        addToCart(productId, sizeFound, true);
+        addToCart(productId, sizeFound, false);
         return;
     }
 
@@ -6685,7 +6694,7 @@ function quickAddToCart(productId) {
 
 
 
-function addToCart(id, size, openDrawer = true) {
+function addToCart(id, size, openDrawer = false) { // Par défaut : ne pas ouvrir le tiroir pour laisser le client continuer ses achats
     if (!Array.isArray(cart)) cart = [];
 
     const prod = products.find(p => String(p.id) === String(id));
@@ -8932,6 +8941,11 @@ function executeSimulatedTransaction(referenceCode) {
                 }).catch(err => console.warn("Supabase order creation notice:", err));
             }
 
+            // Trigger admin notification if active
+            if (currentUser && currentUser.isAdmin && typeof notifyAdminNewOrder === "function") {
+                notifyAdminNewOrder(createdOrder);
+            }
+
             // 4. Generate invoice receipt ticket
             renderInvoiceTicket(createdOrder);
 
@@ -9852,6 +9866,184 @@ if (btnGuestSkipAccount) {
 
 
 
+
+// --- REALTIME ADMIN ORDER NOTIFICATION & AUDIO CHIME ---
+function playOrderChime() {
+    try {
+        const AudioCtx = window.AudioContext || window.webkitAudioContext;
+        if (!AudioCtx) return;
+        const ctx = new AudioCtx();
+        const notes = [523.25, 659.25, 783.99, 1046.50]; // C5, E5, G5, C6 (Harmonie luxueuse)
+        const startTime = ctx.currentTime;
+        notes.forEach((freq, idx) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.type = "sine";
+            osc.frequency.setValueAtTime(freq, startTime + idx * 0.11);
+            gain.gain.setValueAtTime(0, startTime + idx * 0.11);
+            gain.gain.linearRampToValueAtTime(0.28, startTime + idx * 0.11 + 0.02);
+            gain.gain.exponentialRampToValueAtTime(0.0001, startTime + idx * 0.11 + 0.35);
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start(startTime + idx * 0.11);
+            osc.stop(startTime + idx * 0.11 + 0.38);
+        });
+    } catch (e) {
+        console.warn("Audio chime notice:", e);
+    }
+}
+
+function triggerDesktopNotification(order) {
+    try {
+        if (!("Notification" in window)) return;
+        const ref = order.reference || order.id || "N/A";
+        const client = order.clientName || order.customer_name || "Client";
+        const total = Number(order.total || order.total_amount || 0).toLocaleString("fr-FR");
+        const title = "🔔 NOUVELLE COMMANDE - DIAW SHOOP";
+        const body = `Commande #${ref} de ${client}\nMontant : ${total} FCFA\nCliquez pour afficher les détails.`;
+
+        if (Notification.permission === "granted") {
+            const notif = new Notification(title, {
+                body: body,
+                icon: "favicon.ico",
+                badge: "favicon.ico"
+            });
+            notif.onclick = function () {
+                window.focus();
+                if (typeof goToAdminOrdersTab === "function") {
+                    goToAdminOrdersTab(ref);
+                }
+            };
+        } else if (Notification.permission !== "denied") {
+            Notification.requestPermission().then(permission => {
+                if (permission === "granted") {
+                    new Notification(title, { body: body, icon: "favicon.ico" });
+                }
+            });
+        }
+    } catch (e) {
+        console.warn("Desktop notification notice:", e);
+    }
+}
+
+window.notifyAdminNewOrder = function (order = {}) {
+    if (!order) return;
+
+    // 1. Son d'alerte Web Audio
+    playOrderChime();
+
+    // 2. Notification Bureau HTML5
+    triggerDesktopNotification(order);
+
+    // 3. Mise à jour du badge de l'onglet admin
+    const pendingBadge = document.getElementById("admin-pending-badge");
+    if (pendingBadge) {
+        const currentCount = parseInt(pendingBadge.textContent || "0", 10) || 0;
+        pendingBadge.textContent = currentCount + 1;
+        pendingBadge.style.display = "inline-flex";
+        pendingBadge.classList.add("badge-pending-pulse");
+    }
+
+    // 4. Bannière visuelle animée sur l'écran
+    let container = document.getElementById("admin-order-alert-container");
+    if (!container) {
+        container = document.createElement("div");
+        container.id = "admin-order-alert-container";
+        container.className = "admin-order-alert-container";
+        document.body.appendChild(container);
+    }
+
+    const banner = document.createElement("div");
+    banner.className = "admin-order-alert-banner";
+    const ref = order.reference || order.id || ("DS-" + Math.floor(100000 + Math.random() * 900000));
+    const client = order.clientName || order.customer_name || "Client";
+    const phone = order.clientPhone || order.customer_phone || "";
+    const total = Number(order.total || order.total_amount || 0).toLocaleString("fr-FR");
+
+    banner.innerHTML = `
+        <div class="admin-order-alert-header">
+            <span class="admin-order-alert-badge"><i class="fa-solid fa-bell"></i> NOUVELLE COMMANDE REÇUE !</span>
+            <button type="button" class="admin-order-alert-close" aria-label="Fermer"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="admin-order-alert-body">
+            <div class="admin-order-alert-title">Commande #${escapeHTML(ref)}</div>
+            <div class="admin-order-alert-info">
+                <span>Client : <strong>${escapeHTML(client)}</strong>${phone ? ` (📞 ${escapeHTML(phone)})` : ''}</span>
+                <span class="admin-order-alert-amount">${total} FCFA</span>
+            </div>
+        </div>
+        <div class="admin-order-alert-actions">
+            <button type="button" class="admin-order-alert-btn btn-view-admin">
+                <i class="fa-solid fa-sliders"></i> Voir dans l'Admin
+            </button>
+            <button type="button" class="admin-order-alert-btn admin-order-alert-btn-sec btn-view-receipt">
+                <i class="fa-solid fa-receipt"></i> Voir le reçu
+            </button>
+        </div>
+    `;
+
+    const closeBtn = banner.querySelector(".admin-order-alert-close");
+    const dismissBanner = () => {
+        banner.classList.add("hide");
+        setTimeout(() => {
+            if (banner.parentNode) banner.parentNode.removeChild(banner);
+        }, 400);
+    };
+
+    if (closeBtn) closeBtn.addEventListener("click", dismissBanner);
+
+    const btnViewAdmin = banner.querySelector(".btn-view-admin");
+    if (btnViewAdmin) {
+        btnViewAdmin.addEventListener("click", () => {
+            dismissBanner();
+            if (typeof goToAdminOrdersTab === "function") goToAdminOrdersTab(ref);
+        });
+    }
+
+    const btnViewReceipt = banner.querySelector(".btn-view-receipt");
+    if (btnViewReceipt) {
+        btnViewReceipt.addEventListener("click", () => {
+            dismissBanner();
+            if (typeof viewOrderInvoiceModal === "function") viewOrderInvoiceModal(ref);
+        });
+    }
+
+    container.appendChild(banner);
+
+    // Auto-dismiss après 12 secondes
+    setTimeout(() => {
+        if (banner.parentNode && !banner.classList.contains("hide")) {
+            dismissBanner();
+        }
+    }, 12000);
+
+    // 5. Rafraîchir le tableau de bord admin si connecté
+    if (currentUser && currentUser.isAdmin && typeof renderAdminDashboard === "function") {
+        try { renderAdminDashboard(); } catch (e) {}
+    }
+};
+
+window.goToAdminOrdersTab = function (orderIdToFocus = null) {
+    if (elements.myOrdersModal) {
+        elements.myOrdersModal.classList.remove("open");
+    }
+    const adminSection = document.getElementById("admin-section");
+    if (adminSection) {
+        adminSection.style.display = "block";
+        adminSection.scrollIntoView({ behavior: "smooth" });
+    }
+    const ordersTabBtn = document.getElementById("admin-orders-tab-btn");
+    if (ordersTabBtn) {
+        ordersTabBtn.click();
+    }
+    if (orderIdToFocus && elements.adminOrdersSearchInput) {
+        elements.adminOrdersSearchInput.value = orderIdToFocus;
+        orderSearchQuery = String(orderIdToFocus).toLowerCase();
+        try { renderAdminDashboard(); } catch (e) {}
+    }
+};
+
+
 window.openMyOrdersModal = function () {
     if (!currentUser) {
         showToast("Veuillez vous connecter pour accéder à l'historique de vos commandes.", "info");
@@ -9861,63 +10053,135 @@ window.openMyOrdersModal = function () {
         return;
     }
 
-    const userEmail = (currentUser.email || "").trim().toLowerCase();
-    const userName = (currentUser.name || "").trim().toLowerCase();
-    const userPhone = (currentUser.phone || "").replace(/\s+/g, "").slice(-9);
+    const isAdminView = Boolean(currentUser && currentUser.isAdmin);
+    const subtitleEl = document.getElementById("my-orders-subtitle");
+    if (subtitleEl) {
+        subtitleEl.innerHTML = isAdminView 
+            ? `<span style="color:var(--accent); font-weight:700;"><i class="fa-solid fa-crown"></i> Mode Administrateur</span> • Historique complet des commandes de la boutique`
+            : "Suivi en temps réel de vos achats";
+    }
 
-    const clientOrders = (orders || []).filter(o => {
-        const orderEmail = (o.clientEmail || "").trim().toLowerCase();
-        const orderName = (o.clientName || "").trim().toLowerCase();
-        const orderPhone = (o.clientPhone || "").replace(/\s+/g, "").slice(-9);
-        const orderUserId = o.userId || o.user_id;
+    let displayedOrders = [];
+    if (isAdminView) {
+        // En mode administrateur : afficher toutes les commandes de la boutique
+        displayedOrders = [...(orders || [])];
+    } else {
+        const userEmail = (currentUser.email || "").trim().toLowerCase();
+        const userName = (currentUser.name || "").trim().toLowerCase();
+        const userPhone = (currentUser.phone || "").replace(/\s+/g, "").slice(-9);
 
-        return (currentUser.id && orderUserId && String(orderUserId) === String(currentUser.id)) ||
-               (userEmail && orderEmail && orderEmail === userEmail) ||
-               (userPhone && orderPhone && orderPhone.length >= 7 && orderPhone === userPhone) ||
-               (userName && orderName && orderName === userName);
-    });
+        displayedOrders = (orders || []).filter(o => {
+            const orderEmail = (o.clientEmail || "").trim().toLowerCase();
+            const orderName = (o.clientName || "").trim().toLowerCase();
+            const orderPhone = (o.clientPhone || "").replace(/\s+/g, "").slice(-9);
+            const orderUserId = o.userId || o.user_id;
+
+            return (currentUser.id && orderUserId && String(orderUserId) === String(currentUser.id)) ||
+                   (userEmail && orderEmail && orderEmail === userEmail) ||
+                   (userPhone && orderPhone && orderPhone.length >= 7 && orderPhone === userPhone) ||
+                   (userName && orderName && orderName === userName);
+        });
+    }
 
     if (elements.myOrdersList) {
         elements.myOrdersList.innerHTML = "";
 
-        if (clientOrders.length === 0) {
-            elements.myOrdersList.innerHTML = `
-                <div style="text-align:center; padding: 40px; color: var(--text-muted)">
-                    <i class="fa-solid fa-receipt" style="font-size: 2.8rem; margin-bottom:15px; color: var(--accent);"></i>
-                    <h3 style="font-size: 1.15rem; margin-bottom: 8px; color: var(--primary);">Aucune commande trouvée</h3>
-                    <p style="font-size: 0.9rem;">Vous n'avez pas encore passé de commande avec ce compte (${escapeHTML(currentUser.email || currentUser.name)}).</p>
+        if (isAdminView) {
+            const adminNotice = document.createElement("div");
+            adminNotice.style.cssText = "background: linear-gradient(135deg, rgba(212,175,55,0.12), rgba(15,23,42,0.05)); border: 1px solid var(--accent); border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap;";
+            adminNotice.innerHTML = `
+                <div>
+                    <div style="font-weight: 700; color: var(--primary); font-size: 0.95rem; display: flex; align-items: center; gap: 6px;">
+                        <i class="fa-solid fa-crown text-accent"></i> Vue Administrateur DIAW SHOOP
+                    </div>
+                    <div style="font-size: 0.82rem; color: var(--text-muted); margin-top: 2px;">
+                        ${displayedOrders.length} commande${displayedOrders.length > 1 ? 's' : ''} enregistrée${displayedOrders.length > 1 ? 's' : ''} au total dans la boutique
+                    </div>
                 </div>
+                <button type="button" class="btn btn-primary btn-sm" onclick="goToAdminOrdersTab()" style="padding: 7px 14px; font-size: 0.82rem; border-radius: 6px; display: inline-flex; align-items: center; gap: 6px;">
+                    <i class="fa-solid fa-gauge"></i> Ouvrir dans l'Espace Admin
+                </button>
             `;
+            elements.myOrdersList.appendChild(adminNotice);
+        }
+
+        if (displayedOrders.length === 0) {
+            const emptyEl = document.createElement("div");
+            emptyEl.style.cssText = "text-align:center; padding: 40px; color: var(--text-muted);";
+            emptyEl.innerHTML = isAdminView ? `
+                <i class="fa-solid fa-inbox" style="font-size: 2.8rem; margin-bottom:15px; color: var(--accent);"></i>
+                <h3 style="font-size: 1.15rem; margin-bottom: 8px; color: var(--primary);">Aucune commande dans la boutique</h3>
+                <p style="font-size: 0.9rem;">Aucun client n'a encore passé de commande. Dès qu'un achat est validé, il apparaîtra ici et dans l'Espace Admin en temps réel.</p>
+            ` : `
+                <i class="fa-solid fa-receipt" style="font-size: 2.8rem; margin-bottom:15px; color: var(--accent);"></i>
+                <h3 style="font-size: 1.15rem; margin-bottom: 8px; color: var(--primary);">Aucune commande trouvée</h3>
+                <p style="font-size: 0.9rem;">Vous n'avez pas encore passé de commande avec ce compte (${escapeHTML(currentUser.email || currentUser.name)}).</p>
+            `;
+            elements.myOrdersList.appendChild(emptyEl);
         } else {
-            clientOrders.forEach(o => {
+            displayedOrders.forEach(o => {
                 const card = document.createElement("div");
                 card.className = "my-order-card";
                 card.style.cssText = "background: #fff; border: 1px solid var(--border-color); border-radius: 10px; padding: 16px; margin-bottom: 14px; box-shadow: var(--shadow-sm);";
                 
                 const itemsCount = (o.items || []).reduce((sum, it) => sum + (it.qty || 1), 0);
                 const itemsNames = (o.items || []).map(it => it.name).join(", ");
+
+                const rawStatus = String(o.status || "Validée");
+                let statusBg = "rgba(34,197,94,0.15)";
+                let statusColor = "#16a34a";
+                let statusIcon = '<i class="fa-solid fa-check"></i>';
+                if (rawStatus.includes("préparation")) {
+                    statusBg = "rgba(245,158,11,0.15)";
+                    statusColor = "#d97706";
+                    statusIcon = '<i class="fa-solid fa-box-open"></i>';
+                } else if (rawStatus.includes("livraison")) {
+                    statusBg = "rgba(14,165,233,0.15)";
+                    statusColor = "#0284c7";
+                    statusIcon = '<i class="fa-solid fa-truck"></i>';
+                } else if (rawStatus.includes("Livré")) {
+                    statusBg = "rgba(16,185,129,0.15)";
+                    statusColor = "#059669";
+                    statusIcon = '<i class="fa-solid fa-circle-check"></i>';
+                } else if (rawStatus.includes("Annul")) {
+                    statusBg = "rgba(239,68,68,0.15)";
+                    statusColor = "#dc2626";
+                    statusIcon = '<i class="fa-solid fa-xmark"></i>';
+                }
                 
                 card.innerHTML = `
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1px solid var(--border-color); padding-bottom:8px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; border-bottom:1px solid var(--border-color); padding-bottom:8px; flex-wrap: wrap; gap: 6px;">
                         <div>
-                            <strong style="color:var(--accent-dark); font-size:1.05rem;">#${o.id}</strong>
-                            <div style="font-size:0.8rem; color:var(--text-muted);">${o.date}</div>
+                            <strong style="color:var(--accent-dark); font-size:1.05rem;">#${escapeHTML(o.reference || o.id)}</strong>
+                            <div style="font-size:0.8rem; color:var(--text-muted);">${escapeHTML(o.date || '')}</div>
                         </div>
-                        <span class="status-badge" style="background:rgba(34,197,94,0.15); color:#16a34a; font-weight:700; padding:4px 10px; border-radius:20px; font-size:0.8rem;">
-                            <i class="fa-solid fa-check"></i> ${escapeHTML(o.status || 'Validée')}
+                        <span class="status-badge" style="background:${statusBg}; color:${statusColor}; font-weight:700; padding:4px 10px; border-radius:20px; font-size:0.8rem;">
+                            ${statusIcon} ${escapeHTML(rawStatus)}
                         </span>
                     </div>
+                    ${isAdminView ? `
+                    <div style="font-size:0.88rem; margin-bottom:6px; color:var(--primary);">
+                        <strong>Client :</strong> ${escapeHTML(o.clientName || 'Client')} ${o.clientPhone ? `• 📞 <a href="tel:${escapeHTML(o.clientPhone)}" style="color:var(--accent); text-decoration:none; font-weight:600;">${escapeHTML(o.clientPhone)}</a>` : ''}
+                    </div>
+                    ` : ''}
                     <div style="font-size:0.88rem; margin-bottom:8px;">
                         <strong>Articles (${itemsCount}) :</strong> <span style="color:var(--text-color);">${escapeHTML(itemsNames)}</span>
                     </div>
-                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-top:12px; flex-wrap: wrap; gap: 8px;">
                         <div>
                             <span style="font-size:0.82rem; color:var(--text-muted);">Total :</span>
-                            <strong style="font-size:1.1rem; color:var(--primary); margin-left:4px;">${Number(o.total).toLocaleString("fr-FR")} FCFA</strong>
+                            <strong style="font-size:1.1rem; color:var(--primary); margin-left:4px;">${Number(o.total || 0).toLocaleString("fr-FR")} FCFA</strong>
                         </div>
-                        <button type="button" class="btn btn-primary btn-sm" onclick="viewOrderInvoiceModal('${o.id}')" style="display:flex; align-items:center; gap:6px; padding:8px 14px; font-size:0.85rem; border-radius:6px;">
-                            <i class="fa-solid fa-receipt"></i> Voir le reçu
-                        </button>
+                        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="viewOrderInvoiceModal('${escapeHTML(o.id || o.reference)}')" style="display:flex; align-items:center; gap:6px; padding:7px 12px; font-size:0.82rem; border-radius:6px;">
+                                <i class="fa-solid fa-receipt"></i> Voir le reçu
+                            </button>
+                            ${isAdminView ? `
+                            <button type="button" class="btn btn-primary btn-sm" onclick="goToAdminOrdersTab('${escapeHTML(o.reference || o.id)}')" style="display:flex; align-items:center; gap:6px; padding:7px 12px; font-size:0.82rem; border-radius:6px;">
+                                <i class="fa-solid fa-sliders"></i> Gérer statut
+                            </button>
+                            ` : ''}
+                        </div>
                     </div>
                 `;
                 elements.myOrdersList.appendChild(card);
