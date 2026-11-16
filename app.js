@@ -2408,6 +2408,8 @@ let searchFilter = "";
 
 let sortOrder = "default";
 
+let catalogDisplayMode = localStorage.getItem("diaw_catalog_view_mode") || "rails";
+
 
 
 let currentOrderFilter = "all";
@@ -4620,366 +4622,405 @@ elements.btnLogout.addEventListener("click", (e) => {
 
 // --- 6. CATALOGUE INTERACTIVITY (DISPLAY, FILTER, SEARCH) ---
 
+// Helper pour instancier une carte produit standard
+function createProductCardElement(p) {
+    const prodReviews = (reviews || []).filter(r => r.productId === p.id);
+    const reviewsCount = prodReviews.length;
+    let ratingHtml = "";
+    if (reviewsCount > 0) {
+        const avgRating = prodReviews.reduce((sum, r) => sum + r.rating, 0) / reviewsCount;
+        ratingHtml = `
+            <div class="product-card-rating" style="margin-bottom: 8px; color: #eab308; font-size: 0.8rem; display: flex; align-items: center; gap: 4px; cursor: pointer;" onclick="openProductDetail('${p.id}')">
+                <span style="font-weight: 700;">${avgRating.toFixed(1)}</span>
+                <span><i class="fa-solid fa-star"></i></span>
+                <span style="color: var(--text-muted); font-size: 0.75rem;">(${reviewsCount} avis)</span>
+            </div>
+        `;
+    }
 
+    const priceContainerHtml = `<div class="product-card-price">${Number(p.price).toLocaleString("fr-FR")} FCFA</div>`;
 
-function renderProductList() {
+    const card = document.createElement("div");
+    card.className = "product-card";
+    card.innerHTML = `
+        <div class="product-card-image-wrapper" onclick="openProductDetail('${p.id}')">
+            <img src="${escapeHTML(p.image)}" alt="${escapeHTML(p.name)}" onerror="this.src='https://placehold.co/400x500?text=${encodeURIComponent(p.name)}'">
+        </div>
+        <div class="product-card-body">
+            <span class="product-category-tag">${escapeHTML(p.category)}</span>
+            <h3 class="product-card-title" onclick="openProductDetail('${p.id}')">${escapeHTML(p.name)}</h3>
+            ${ratingHtml}
+            ${priceContainerHtml}
+        </div>
+        <div class="product-card-hover-actions">
+            <button class="quick-add-btn" onclick="event.stopPropagation(); quickAddToCart('${p.id}')" title="Ajout rapide au panier">
+                <i class="fa-solid fa-plus"></i>
+            </button>
+        </div>
+    `;
+    return card;
+}
 
+// Navigation directe vers une catégorie depuis le bouton "Voir tout" d'un rayon
+window.viewCategoryFromRail = function(targetCatKey) {
+    activeCategory = targetCatKey;
+    if (elements.categoryTabs) {
+        const tabs = elements.categoryTabs.querySelectorAll(".tab-btn");
+        tabs.forEach(tab => {
+            const cat = (tab.getAttribute("data-category") || "").toLowerCase().trim();
+            const target = targetCatKey.toLowerCase().trim();
+            const isMatch = cat === target ||
+                (target === "vetements" && (cat.includes("vetement") || cat.includes("abaya"))) ||
+                (target === "robes" && (cat.includes("wax") || cat.includes("robe"))) ||
+                (target === "beaute" && (cat.includes("beaut") || cat.includes("soin"))) ||
+                (target === "parfums" && (cat.includes("parfum") || cat.includes("encens"))) ||
+                (target === "chaussures" && (cat.includes("chaussure") || cat.includes("sandale"))) ||
+                (target === "sacs" && (cat.includes("sac") && !cat.includes("chaussure") && !cat.includes("ensemble"))) ||
+                (target === "ensembles" && (cat.includes("ensemble") || (cat.includes("sac") && cat.includes("chaussure"))));
+            if (isMatch) {
+                tab.classList.add("active");
+            } else {
+                tab.classList.remove("active");
+            }
+        });
+    }
+    renderProductList();
+    const prodSec = document.querySelector(".products-section");
+    if (prodSec) {
+        prodSec.scrollIntoView({ behavior: "smooth", block: "start" });
+    }
+};
 
+function renderProductRailSection(sectionConfig) {
+    const { key, title, icon, items } = sectionConfig;
+    if (!items || items.length === 0) return null;
 
-    elements.productsGrid.innerHTML = "";
+    const section = document.createElement("section");
+    section.className = "product-rail-section";
+    section.setAttribute("data-rail-category", key);
 
+    const header = document.createElement("div");
+    header.className = "product-rail-header";
+    header.innerHTML = `
+        <div class="product-rail-title-group">
+            <span class="product-rail-icon"><i class="${icon}"></i></span>
+            <h3 class="product-rail-title">${escapeHTML(title)}</h3>
+            <span class="product-rail-count">${items.length} ${items.length > 1 ? "articles" : "article"}</span>
+        </div>
+        ${key !== "tendances" ? `
+        <button type="button" class="product-rail-see-all-btn" onclick="viewCategoryFromRail('${escapeHTML(key)}')">
+            <span>Voir tout</span>
+            <i class="fa-solid fa-arrow-right"></i>
+        </button>
+        ` : ''}
+    `;
+    section.appendChild(header);
 
+    const wrapper = document.createElement("div");
+    wrapper.className = "product-rail-wrapper";
 
+    const prevBtn = document.createElement("button");
+    prevBtn.type = "button";
+    prevBtn.className = "product-rail-scroll-btn prev is-hidden";
+    prevBtn.setAttribute("aria-label", "Défiler vers la gauche");
+    prevBtn.innerHTML = '<i class="fa-solid fa-chevron-left"></i>';
 
+    const nextBtn = document.createElement("button");
+    nextBtn.type = "button";
+    nextBtn.className = "product-rail-scroll-btn next";
+    nextBtn.setAttribute("aria-label", "Défiler vers la droite");
+    nextBtn.innerHTML = '<i class="fa-solid fa-chevron-right"></i>';
 
+    const track = document.createElement("div");
+    track.className = "product-rail-track";
+    track.setAttribute("role", "region");
+    track.setAttribute("aria-label", `Rayon ${title}`);
 
-
-    const storeSettings = JSON.parse(localStorage.getItem("diaw_shoop_settings")) || {};
-
-
-
-    const promosActive = false;
-
-
-
-
-
-
-
-    // Apply filters
-
-
-
-    let filtered = products.filter(p => {
-
-
-
-        const pCat = (p.category || "").toLowerCase().trim();
-        const actCat = (activeCategory || "all").toLowerCase().trim();
-        const matchCategory = actCat === "all" || 
-            pCat === actCat ||
-            (actCat === "vetements" && (pCat === "vêtements & abayas" || pCat === "vetements")) ||
-            (actCat === "robes" && (pCat === "robes wax" || pCat === "robes")) ||
-            (actCat === "beaute" && (pCat === "soins de beauté" || pCat === "beaute")) ||
-            (actCat === "parfums" && (pCat === "parfums & encens" || pCat === "parfums")) ||
-            (actCat === "vêtements & abayas" && (pCat === "vêtements & abayas" || pCat === "vetements")) ||
-            (actCat === "robes wax" && (pCat === "robes wax" || pCat === "robes")) ||
-            (actCat === "soins de beauté" && (pCat === "soins de beauté" || pCat === "beaute")) ||
-            (actCat === "parfums & encens" && (pCat === "parfums & encens" || pCat === "parfums"));
-
-
-
-        const safeName = p.name || "";
-
-
-
-        const safeDesc = p.description || "";
-
-
-
-        const safeCat = p.category || "";
-
-
-
-        const q = searchFilter.toLowerCase().trim();
-
-
-
-        const matchSearch = !q ||
-
-
-
-            safeName.toLowerCase().includes(q) ||
-
-
-
-            safeDesc.toLowerCase().includes(q) ||
-
-
-
-            safeCat.toLowerCase().includes(q);
-
-
-
-        return matchCategory && matchSearch;
-
-
-
+    items.forEach(p => {
+        track.appendChild(createProductCardElement(p));
     });
 
-
-
-
-
-
-
-    // Sort
-
-
-
-    if (sortOrder === "price-asc") {
-
-
-
-        filtered.sort((a, b) => a.price - b.price);
-
-
-
-    } else if (sortOrder === "price-desc") {
-
-
-
-        filtered.sort((a, b) => b.price - a.price);
-
-
-
-    }
-
-
-
-
-
-
-
-    // Display results
-
-
-
-    if (filtered.length === 0) {
-
-
-
-        elements.productsGrid.innerHTML = `
-
-
-
-            <div class="loading-spinner-wrapper" style="grid-column: 1 / -1; text-align: center; padding: 45px 20px;">
-
-
-
-                <i class="fa-solid fa-magnifying-glass" style="font-size: 2.8rem; color: var(--accent); margin-bottom: 15px;"></i>
-
-
-
-                <h3 style="margin-bottom: 8px;">${searchFilter ? "Aucun article trouvé" : "Boutique en cours d'approvisionnement"}</h3>
-
-                <p style="color: var(--text-muted); margin-bottom: 20px; max-width: 450px; margin-left: auto; margin-right: auto; line-height: 1.5;">
-
-                    ${searchFilter ? `Aucun produit ne correspond à "<strong>${escapeHTML(searchFilter)}</strong>".` : "Les nouvelles collections exclusives et créations de DIAW SHOOP arrivent très prochainement. Restez connectés !"}
-
-                </p>
-
-
-
-                ${searchFilter ? '<button type="button" class="btn btn-secondary btn-sm" id="btn-reset-empty-search" style="padding: 10px 18px; border-radius: 50px;"><i class="fa-solid fa-rotate-left"></i> Voir tous les articles</button>' : ''}
-
-
-
-            </div>
-
-
-
-        `;
-
-
-
-        const resetBtn = document.getElementById("btn-reset-empty-search");
-
-        if (resetBtn) {
-
-            resetBtn.addEventListener("click", () => {
-
-                if (elements.searchInput) elements.searchInput.value = "";
-
-                searchFilter = "";
-
-                if (elements.activeFiltersInfo) elements.activeFiltersInfo.style.display = "none";
-
-                renderProductList();
-
-            });
-
-        }
-
-
-
-        return;
-
-
-
-    }
-
-
-
-
-
-
-
-    filtered.forEach(p => {
-
-
-
-        // Calculate rating details
-
-
-
-        const prodReviews = reviews.filter(r => r.productId === p.id);
-
-
-
-        const reviewsCount = prodReviews.length;
-
-
-
-        let ratingHtml = "";
-
-
-
-        if (reviewsCount > 0) {
-
-
-
-            const avgRating = prodReviews.reduce((sum, r) => sum + r.rating, 0) / reviewsCount;
-
-
-
-            ratingHtml = `
-
-
-
-                <div class="product-card-rating" style="margin-bottom: 8px; color: #eab308; font-size: 0.8rem; display: flex; align-items: center; gap: 4px; cursor: pointer;" onclick="openProductDetail('${p.id}')">
-
-
-
-                    <span style="font-weight: 700;">${avgRating.toFixed(1)}</span>
-
-
-
-                    <span><i class="fa-solid fa-star"></i></span>
-
-
-
-                    <span style="color: var(--text-muted); font-size: 0.75rem;">(${reviewsCount} avis)</span>
-
-
-
-                </div>
-
-
-
-            `;
-
-
-
+    prevBtn.addEventListener("click", () => {
+        const scrollAmount = Math.max(260, Math.floor(track.clientWidth * 0.75));
+        track.scrollBy({ left: -scrollAmount, behavior: "smooth" });
+    });
+
+    nextBtn.addEventListener("click", () => {
+        const scrollAmount = Math.max(260, Math.floor(track.clientWidth * 0.75));
+        track.scrollBy({ left: scrollAmount, behavior: "smooth" });
+    });
+
+    function updateScrollArrows() {
+        const scrollLeft = track.scrollLeft;
+        const maxScroll = track.scrollWidth - track.clientWidth;
+        if (scrollLeft <= 10) {
+            prevBtn.classList.add("is-hidden");
         } else {
-            ratingHtml = "";
+            prevBtn.classList.remove("is-hidden");
         }
 
-
-
-
-
-
-
-        const priceContainerHtml = `<div class="product-card-price">${Number(p.price).toLocaleString("fr-FR")} FCFA</div>`;
-
-
-
-
-
-
-
-        const card = document.createElement("div");
-
-
-
-        card.className = "product-card";
-
-
-
-        card.innerHTML = `
-
-
-
-            <div class="product-card-image-wrapper" onclick="openProductDetail('${p.id}')">
-
-
-
-                
-
-
-
-                <img src="${escapeHTML(p.image)}" alt="${escapeHTML(p.name)}" onerror="this.src='https://placehold.co/400x500?text=${encodeURIComponent(p.name)}'">
-
-
-
-            </div>
-
-
-
-            <div class="product-card-body">
-
-
-
-                <span class="product-category-tag">${escapeHTML(p.category)}</span>
-
-
-
-                <h3 class="product-card-title" onclick="openProductDetail('${p.id}')">${escapeHTML(p.name)}</h3>
-
-
-
-                ${ratingHtml}
-
-
-
-                ${priceContainerHtml}
-
-
-
-            </div>
-
-
-
-            <div class="product-card-hover-actions">
-
-
-
-                <button class="quick-add-btn" onclick="event.stopPropagation(); quickAddToCart('${p.id}')" title="Ajout rapide au panier">
-
-
-
-                    <i class="fa-solid fa-plus"></i>
-
-
-
-                </button>
-
-
-
-            </div>
-
-
-
-        `;
-
-
-
-        elements.productsGrid.appendChild(card);
-
-
-
-    });
-
-
-
+        if (scrollLeft >= maxScroll - 10 || maxScroll <= 10) {
+            nextBtn.classList.add("is-hidden");
+        } else {
+            nextBtn.classList.remove("is-hidden");
+        }
+    }
+
+    track.addEventListener("scroll", updateScrollArrows, { passive: true });
+    setTimeout(updateScrollArrows, 200);
+
+    wrapper.appendChild(prevBtn);
+    wrapper.appendChild(track);
+    wrapper.appendChild(nextBtn);
+    section.appendChild(wrapper);
+
+    return section;
+}
+
+// Initialisation du sélecteur de mode d'affichage (Rayons vs Grille)
+function initCatalogViewSelector() {
+    const btnRails = document.getElementById("btn-view-mode-rails");
+    const btnGrid = document.getElementById("btn-view-mode-grid");
+    if (!btnRails || !btnGrid) return;
+
+    function updateButtons() {
+        if (catalogDisplayMode === "rails") {
+            btnRails.classList.add("active");
+            btnGrid.classList.remove("active");
+        } else {
+            btnGrid.classList.add("active");
+            btnRails.classList.remove("active");
+        }
+    }
+
+    btnRails.onclick = () => {
+        catalogDisplayMode = "rails";
+        localStorage.setItem("diaw_catalog_view_mode", "rails");
+        updateButtons();
+        renderProductList();
+    };
+
+    btnGrid.onclick = () => {
+        catalogDisplayMode = "grid";
+        localStorage.setItem("diaw_catalog_view_mode", "grid");
+        updateButtons();
+        renderProductList();
+    };
+
+    updateButtons();
 }
 
 
+// Détection et attribution stricte d'une catégorie unique par produit (ZÉRO doublon)
+function getProductCategoryKey(prod) {
+    const rawCat = (prod.category || '').toLowerCase().trim();
+    const rawName = (prod.name || '').toLowerCase().trim();
+    const rawDesc = (prod.description || '').toLowerCase().trim();
+    const fullText = (rawCat + ' ' + rawName + ' ' + rawDesc).toLowerCase();
+
+    // 1. Ensembles Sacs & Chaussures (combos, packs assortis, sac ET chaussures)
+    const isCombo = rawCat.includes('ensemble') || fullText.includes('ensemble') || 
+        fullText.includes('combo') || fullText.includes('assorti') || 
+        fullText.includes('coffret') || fullText.includes('set sac');
+    if (isCombo) return 'ensembles';
+
+    // 2. Chaussures seules
+    const isShoe = rawCat === 'chaussures' || rawCat.includes('chaussure') || rawCat.includes('sandale') || 
+        rawCat.includes('escarpin') || rawCat.includes('talon') || rawCat.includes('mule') || 
+        rawCat.includes('babouche') || rawCat.includes('chaussuresi') ||
+        rawName.includes('escarpin') || rawName.includes('talon') || rawName.includes('sandale');
+
+    // 3. Sacs seuls
+    const isBag = rawCat === 'sacs' || rawCat.includes('maroquinerie') || (rawCat.includes('sac') && !rawCat.includes('chaussure')) ||
+        rawName.includes('sac à main') || rawName.includes('pochette') || rawName.includes('cabas') || rawName.includes('sacoche');
+
+    // Résolution des anciennes catégories mixtes 'Sacs & Chaussures'
+    if (rawCat.includes('sacs & chaussures') || rawCat.includes('sacs & chaussuresi') || rawCat === 'sac & chaussure') {
+        if (isCombo) return 'ensembles';
+        if (isBag && !isShoe) return 'sacs';
+        return 'chaussures';
+    }
+
+    if (isShoe && !isBag) return 'chaussures';
+    if (isBag && !isShoe) return 'sacs';
+    if (isShoe && isBag) return 'ensembles';
+
+    // Catégories classiques
+    if (rawCat === 'vetements' || rawCat.includes('abaya') || rawCat.includes('vetement') || rawCat.includes('vêtement')) return 'vetements';
+    if (rawCat === 'robes' || rawCat.includes('wax') || rawCat.includes('robe')) return 'robes';
+    if (rawCat === 'beaute' || rawCat.includes('beauté') || rawCat.includes('beaute') || rawCat.includes('bio') || rawCat.includes('soin') || rawCat.includes('crème')) return 'beaute';
+    if (rawCat === 'parfums' || rawCat.includes('parfum') || rawCat.includes('encens') || rawCat.includes('oud') || rawCat.includes('thiouraye')) return 'parfums';
+    if (rawCat === 'bijoux' || rawCat.includes('bijou') || rawCat.includes('accessoire')) return 'bijoux';
+
+    return rawCat || 'autres';
+}
 
 
+function renderProductList() {
+    if (!elements.productsGrid) return;
 
+    elements.productsGrid.innerHTML = "";
 
+    const storeSettings = JSON.parse(localStorage.getItem("diaw_shoop_settings")) || {};
+    const promosActive = false;
+
+    // Apply filters
+    let filtered = products.filter(p => {
+        const pCat = (p.category || "").toLowerCase().trim();
+        const actCat = (activeCategory || "all").toLowerCase().trim();
+        const pKey = getProductCategoryKey(p);
+        const matchCategory = actCat === "all" || 
+            pCat === actCat ||
+            pKey === actCat ||
+            (actCat === "vetements" && (pKey === "vetements" || pCat.includes("abaya") || pCat.includes("vetement"))) ||
+            (actCat === "robes" && (pKey === "robes" || pCat.includes("wax") || pCat.includes("robe"))) ||
+            (actCat === "beaute" && (pKey === "beaute" || pCat.includes("beauté") || pCat.includes("soin"))) ||
+            (actCat === "parfums" && (pKey === "parfums" || pCat.includes("parfum") || pCat.includes("encens"))) ||
+            (actCat === "chaussures" && pKey === "chaussures") ||
+            (actCat === "sacs" && pKey === "sacs") ||
+            (actCat === "ensembles" && pKey === "ensembles") ||
+            (actCat === "chaussures & sandales" && pKey === "chaussures") ||
+            (actCat === "sacs & maroquinerie" && pKey === "sacs") ||
+            (actCat === "ensembles sacs & chaussures" && pKey === "ensembles");
+
+        const safeName = p.name || "";
+        const safeDesc = p.description || "";
+        const safeCat = p.category || "";
+        const q = searchFilter.toLowerCase().trim();
+
+        const matchSearch = !q ||
+            safeName.toLowerCase().includes(q) ||
+            safeDesc.toLowerCase().includes(q) ||
+            safeCat.toLowerCase().includes(q);
+
+        return matchCategory && matchSearch;
+    });
+
+    // Sort
+    if (sortOrder === "price-asc") {
+        filtered.sort((a, b) => a.price - b.price);
+    } else if (sortOrder === "price-desc") {
+        filtered.sort((a, b) => b.price - a.price);
+    }
+
+    // Display results
+    if (filtered.length === 0) {
+        elements.productsGrid.className = "products-grid";
+        elements.productsGrid.innerHTML = `
+            <div class="loading-spinner-wrapper" style="grid-column: 1 / -1; text-align: center; padding: 45px 20px;">
+                <i class="fa-solid fa-magnifying-glass" style="font-size: 2.8rem; color: var(--accent); margin-bottom: 15px;"></i>
+                <h3 style="margin-bottom: 8px;">${searchFilter ? "Aucun article trouvé" : "Boutique en cours d'approvisionnement"}</h3>
+                <p style="color: var(--text-muted); margin-bottom: 20px; max-width: 450px; margin-left: auto; margin-right: auto; line-height: 1.5;">
+                    ${searchFilter ? `Aucun produit ne correspond à "<strong>${escapeHTML(searchFilter)}</strong>".` : "Les nouvelles collections exclusives et créations de DIAW SHOOP arrivent très prochainement. Restez connectés !"}
+                </p>
+                ${searchFilter ? '<button type="button" class="btn btn-secondary btn-sm" id="btn-reset-empty-search" style="padding: 10px 18px; border-radius: 50px;"><i class="fa-solid fa-rotate-left"></i> Voir tous les articles</button>' : ''}
+            </div>
+        `;
+
+        const resetBtn = document.getElementById("btn-reset-empty-search");
+        if (resetBtn) {
+            resetBtn.addEventListener("click", () => {
+                if (elements.searchInput) elements.searchInput.value = "";
+                searchFilter = "";
+                if (elements.activeFiltersInfo) elements.activeFiltersInfo.style.display = "none";
+                renderProductList();
+            });
+        }
+        return;
+    }
+
+    // Synchronisation de l'état du sélecteur de vue (Rayons vs Grille)
+    initCatalogViewSelector();
+
+    // DÉCISION DU MODE D'AFFICHAGE :
+    // Si catégorie spécifique OU recherche textuelle active OU mode grille forcé : Grille 2D classique
+    // Si catégorie "all" ET pas de recherche ET mode "rails" : Rayons horizontaux avec défilement vertical
+    const shouldShowRails = (activeCategory || "all").toLowerCase() === "all" && !searchFilter && catalogDisplayMode === "rails";
+
+    if (!shouldShowRails) {
+        // Mode Grille classique
+        elements.productsGrid.className = "products-grid";
+        filtered.forEach(p => {
+            elements.productsGrid.appendChild(createProductCardElement(p));
+        });
+        return;
+    }
+
+    // Mode Rayons (Option 1 : Défilement horizontal par rayon + vertical global)
+    elements.productsGrid.className = "products-rails-view";
+
+    const standardCats = [
+        { key: "vetements", name: "Vêtements & Abayas", icon: "fa-solid fa-shirt" },
+        { key: "robes", name: "Robes Wax Africaines", icon: "fa-solid fa-gem" },
+        { key: "beaute", name: "Soins de Beauté & Bio", icon: "fa-solid fa-spa" },
+        { key: "parfums", name: "Parfums & Encens", icon: "fa-solid fa-spray-can-sparkles" },
+        { key: "chaussures", name: "Chaussures & Sandales", icon: "fa-solid fa-shoe-prints" },
+        { key: "sacs", name: "Sacs & Maroquinerie", icon: "fa-solid fa-bag-shopping" },
+        { key: "ensembles", name: "Ensembles Sacs & Chaussures", icon: "fa-solid fa-gem" },
+        { key: "bijoux", name: "Bijoux & Accessoires", icon: "fa-solid fa-ring" }
+    ];
+
+    const railSections = [];
+
+    // 1. Rayon "Tendances & Coups de Cœur" si au moins 4 articles
+    if (filtered.length >= 4) {
+        railSections.push({
+            key: "tendances",
+            title: "🔥 Tendances & Coups de Cœur",
+            icon: "fa-solid fa-fire",
+            items: filtered.slice(0, 8)
+        });
+    }
+
+    // 2. Rayons par catégorie standard avec RÈGLE STRICTE ANTI-DOUBLON
+    const assignedIds = new Set();
+    standardCats.forEach(c => {
+        const catItems = filtered.filter(p => !assignedIds.has(p.id) && getProductCategoryKey(p) === c.key);
+        if (catItems.length > 0) {
+            catItems.forEach(p => assignedIds.add(p.id));
+            railSections.push({
+                key: c.key,
+                title: c.name,
+                icon: c.icon,
+                items: catItems
+            });
+        }
+    });
+
+    // 3. Catégories personnalisées résiduelles (si création d'une autre catégorie par l'admin)
+    const remaining = filtered.filter(p => !assignedIds.has(p.id));
+    const otherGroups = {};
+    remaining.forEach(p => {
+        const rawCat = (p.category || "Autres Créations").trim();
+        if (!otherGroups[rawCat]) otherGroups[rawCat] = [];
+        otherGroups[rawCat].push(p);
+    });
+
+    Object.keys(otherGroups).forEach(catName => {
+        railSections.push({
+            key: catName.toLowerCase(),
+            title: catName,
+            icon: "fa-solid fa-tag",
+            items: otherGroups[catName]
+        });
+    });
+
+    // Si aucune section créée, fallback sur grille classique
+    if (railSections.length === 0) {
+        elements.productsGrid.className = "products-grid";
+        filtered.forEach(p => {
+            elements.productsGrid.appendChild(createProductCardElement(p));
+        });
+        return;
+    }
+
+    railSections.forEach(secConfig => {
+        const secEl = renderProductRailSection(secConfig);
+        if (secEl) {
+            elements.productsGrid.appendChild(secEl);
+        }
+    });
+}
 
 // Normalisation des colonnes diawshoop_products vers le modèle de rendu
 
@@ -5013,7 +5054,17 @@ function normalizeProduct(p) {
 
 
 
-        category: p.category || 'vetements',
+        category: (() => {
+            const raw = (p.category || 'vetements').trim();
+            const lower = raw.toLowerCase();
+            if (lower === 'sacs & chaussuresi' || lower === 'sacs & chaussures') {
+                const nameDesc = ((p.name || '') + ' ' + (p.description || '')).toLowerCase();
+                if (nameDesc.includes('ensemble') || nameDesc.includes('combo') || nameDesc.includes('assorti')) return 'Ensembles Sacs & Chaussures';
+                if (nameDesc.includes('sac') && !nameDesc.includes('chaussure')) return 'Sacs & Maroquinerie';
+                return 'Chaussures & Sandales';
+            }
+            return raw;
+        })(),
 
 
 
@@ -5704,15 +5755,45 @@ function renderCategoryTabs() {
         "vetements": "Vêtements & Abayas",
         "robes": "Robes Wax",
         "beaute": "Soins de Beauté",
-        "parfums": "Parfums & Encens"
+        "parfums": "Parfums & Encens",
+        "chaussures": "Chaussures & Sandales",
+        "sacs": "Sacs & Maroquinerie",
+        "ensembles": "Ensembles Sacs & Chaussures",
+        "ensembles sacs & chaussures": "Ensembles Sacs & Chaussures",
+        "chaussures & sandales": "Chaussures & Sandales",
+        "sacs & maroquinerie": "Sacs & Maroquinerie",
+        "sacs & chaussures": "Ensembles Sacs & Chaussures",
+        "sacs & chaussuresi": "Chaussures & Sandales"
     };
 
     let html = `<button class="tab-btn ${(activeCategory || 'all').toLowerCase() === 'all' ? 'active' : ''}" data-category="all">Tout</button>`;
 
+    // Catégories de base indispensables
+    const coreCats = [
+        { key: "vetements", label: "Vêtements & Abayas" },
+        { key: "robes", label: "Robes Wax" },
+        { key: "beaute", label: "Soins de Beauté" },
+        { key: "parfums", label: "Parfums & Encens" },
+        { key: "chaussures", label: "Chaussures & Sandales" },
+        { key: "sacs", label: "Sacs & Maroquinerie" },
+        { key: "ensembles", label: "Ensembles Sacs & Chaussures" }
+    ];
+
+    const addedLabels = new Set();
+    coreCats.forEach(c => {
+        const isActive = (activeCategory || '').toLowerCase() === c.key || (activeCategory || '').toLowerCase() === c.label.toLowerCase();
+        html += `<button class="tab-btn ${isActive ? 'active' : ''}" data-category="${escapeHTML(c.key)}">${escapeHTML(c.label)}</button>`;
+        addedLabels.add(c.label.toLowerCase());
+    });
+
+    // Autres catégories dynamiques ajoutées par l'administrateur
     categoriesMap.forEach((origName, key) => {
         const displayLabel = labelMap[key] || origName;
-        const isActive = (activeCategory || '').toLowerCase() === key || (activeCategory || '').toLowerCase() === displayLabel.toLowerCase();
-        html += `<button class="tab-btn ${isActive ? 'active' : ''}" data-category="${escapeHTML(origName)}">${escapeHTML(displayLabel)}</button>`;
+        if (!addedLabels.has(displayLabel.toLowerCase()) && !key.includes('chaussuresi')) {
+            const isActive = (activeCategory || '').toLowerCase() === key || (activeCategory || '').toLowerCase() === displayLabel.toLowerCase();
+            html += `<button class="tab-btn ${isActive ? 'active' : ''}" data-category="${escapeHTML(origName)}">${escapeHTML(displayLabel)}</button>`;
+            addedLabels.add(displayLabel.toLowerCase());
+        }
     });
 
     elements.categoryTabs.innerHTML = html;
@@ -5730,8 +5811,19 @@ function renderCategoryTabs() {
     // Update datalist suggestions for admin form
     const datalist = document.getElementById("categories-datalist");
     if (datalist) {
-        const defaultCats = ["Vêtements & Abayas", "Robes Wax", "Soins de Beauté", "Parfums & Encens", "Accessoires", "Bijoux", "Sacs & Chaussures"];
-        const allSuggestions = Array.from(new Set([...defaultCats, ...Array.from(categoriesMap.values())]));
+        const defaultCats = [
+            "Vêtements & Abayas",
+            "Robes Wax",
+            "Soins de Beauté",
+            "Parfums & Encens",
+            "Chaussures & Sandales",
+            "Sacs & Maroquinerie",
+            "Ensembles Sacs & Chaussures",
+            "Accessoires",
+            "Bijoux"
+        ];
+        const allSuggestions = Array.from(new Set([...defaultCats, ...Array.from(categoriesMap.values())]))
+            .filter(c => !c.toLowerCase().includes('chaussuresi'));
         datalist.innerHTML = allSuggestions.map(c => `<option value="${escapeHTML(c)}"></option>`).join("");
     }
 }
@@ -5778,9 +5870,7 @@ elements.categoryTabs.querySelectorAll(".tab-btn").forEach(btn => {
 
 
 
-// Search functionality (Safeguarded)
-
-
+// Search functionality (Safeguarded & En-tête Dynamique)
 
 function handleSearch() {
     if (!elements.searchInput) return;
@@ -5789,12 +5879,18 @@ function handleSearch() {
 
     const inlineClearBtn = document.getElementById("clear-search-inline-btn");
     if (inlineClearBtn) {
-        inlineClearBtn.style.display = searchFilter ? "block" : "none";
+        inlineClearBtn.style.display = searchFilter ? "flex" : "none";
     }
 
     if (searchFilter) {
         if (elements.activeFiltersInfo) elements.activeFiltersInfo.style.display = "flex";
         if (elements.searchQueryText) elements.searchQueryText.textContent = searchFilter;
+        
+        // Défilement fluide vers la section produits si l'utilisateur est tout en haut
+        const prodSec = document.querySelector(".products-section");
+        if (prodSec && window.scrollY < prodSec.offsetTop - 120) {
+            prodSec.scrollIntoView({ behavior: "smooth", block: "start" });
+        }
     } else {
         if (elements.activeFiltersInfo) elements.activeFiltersInfo.style.display = "none";
     }
@@ -5802,89 +5898,98 @@ function handleSearch() {
     renderProductList();
 }
 
+// Initialisation du déploiement de la barre de recherche dans l'en-tête
+function setupHeaderSearch() {
+    const trigger = document.getElementById("header-search-trigger");
+    const bar = document.getElementById("header-search-bar");
+    const closeBtn = document.getElementById("header-search-close");
+    const inlineClear = document.getElementById("clear-search-inline-btn");
+    const input = document.getElementById("search-input");
 
+    if (!trigger || !bar) return;
 
-if (elements.searchBtn) {
+    function openSearch() {
+        bar.classList.add("active");
+        trigger.classList.add("active");
+        if (input) {
+            setTimeout(() => input.focus(), 100);
+        }
+    }
 
+    function closeSearch() {
+        bar.classList.remove("active");
+        trigger.classList.remove("active");
+    }
 
+    trigger.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (bar.classList.contains("active")) {
+            closeSearch();
+        } else {
+            openSearch();
+        }
+    });
 
-    elements.searchBtn.addEventListener("click", handleSearch);
+    if (closeBtn) {
+        closeBtn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            closeSearch();
+        });
+    }
 
+    if (inlineClear && input) {
+        inlineClear.addEventListener("click", (e) => {
+            e.stopPropagation();
+            input.value = "";
+            inlineClear.style.display = "none";
+            handleSearch();
+            input.focus();
+        });
+    }
 
+    // Fermeture avec la touche Échap
+    document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape" && bar.classList.contains("active")) {
+            closeSearch();
+        }
+    });
 
+    // Fermeture au clic à l'extérieur
+    document.addEventListener("click", (e) => {
+        if (bar.classList.contains("active")) {
+            if (!bar.contains(e.target) && !trigger.contains(e.target)) {
+                closeSearch();
+            }
+        }
+    });
 }
-
-
+setupHeaderSearch();
 
 if (elements.searchInput) {
-
-
-
     elements.searchInput.addEventListener("input", handleSearch);
 
-
-
     elements.searchInput.addEventListener("keypress", (e) => {
-
-
-
         if (e.key === "Enter") {
-
             e.preventDefault();
-
             handleSearch();
-
+            const prodSec = document.querySelector(".products-section");
+            if (prodSec) {
+                prodSec.scrollIntoView({ behavior: "smooth", block: "start" });
+            }
         }
-
-
-
     });
-
-
-
 }
-
-
 
 if (elements.clearSearchBtn) {
-
-
-
     elements.clearSearchBtn.addEventListener("click", () => {
-
-
-
         if (elements.searchInput) elements.searchInput.value = "";
-
-
-
         searchFilter = "";
-
-
-
+        const inlineClear = document.getElementById("clear-search-inline-btn");
+        if (inlineClear) inlineClear.style.display = "none";
         if (elements.activeFiltersInfo) elements.activeFiltersInfo.style.display = "none";
-
-
-
         renderProductList();
-
-
-
     });
-
-
-
 }
-
-
-
-
-
-
-
-// Sorting Event
-
-
 
 if (elements.sortSelect) {
     elements.sortSelect.addEventListener("change", function () {

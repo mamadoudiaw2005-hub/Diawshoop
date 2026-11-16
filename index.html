@@ -22,7 +22,7 @@
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-    <link rel="stylesheet" href="style.css?v=24">
+    <link rel="stylesheet" href="style.css?v=27">
 
     <!-- Google Identity Services SDK for Real Google Sign-In -->
 
@@ -189,6 +189,20 @@
 
         </div>
 
+        <!-- Header Collapsible Search Bar (Recherche Rapide Déroulante) -->
+        <div class="header-search-bar" id="header-search-bar">
+            <div class="header-search-inner">
+                <i class="fa-solid fa-magnifying-glass header-search-icon"></i>
+                <input type="text" id="search-input" placeholder="Rechercher une robe, abaya, soin bio, parfum..." autocomplete="off">
+                <button type="button" id="clear-search-inline-btn" class="header-search-clear-btn" title="Effacer la saisie" style="display: none;">
+                    <i class="fa-solid fa-circle-xmark"></i>
+                </button>
+                <button type="button" class="header-search-close-btn" id="header-search-close" title="Fermer la recherche" aria-label="Fermer">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+        </div>
+
     </header>
 
 
@@ -295,20 +309,6 @@
 
                 </div>
 
-                <!-- Barre de Recherche de la Boutique -->
-                <div class="shop-search-wrapper" style="max-width: 650px; margin: 25px auto 30px auto; padding: 0 15px;">
-                    <div class="shop-search-box" style="display: flex; align-items: center; background: #ffffff; border: 2px solid var(--accent); border-radius: 50px; padding: 6px 8px 6px 20px; box-shadow: 0 4px 15px rgba(212, 175, 55, 0.15); transition: all 0.25s ease;">
-                        <i class="fa-solid fa-magnifying-glass" style="color: var(--accent-dark); font-size: 1.1rem; margin-right: 12px;"></i>
-                        <input type="text" id="search-input" placeholder="Rechercher un article, robe, abaya, soin bio, parfum..." style="flex: 1; border: none; outline: none; background: transparent; font-size: 0.95rem; color: var(--text-main); padding: 10px 0; font-family: inherit;" autocomplete="off">
-                        <button type="button" id="clear-search-inline-btn" style="display: none; background: none; border: none; color: var(--text-muted); cursor: pointer; padding: 8px 12px; font-size: 1rem;" title="Effacer la saisie">
-                            <i class="fa-solid fa-circle-xmark"></i>
-                        </button>
-                        <button type="button" class="btn btn-primary" id="search-btn" style="border-radius: 50px; padding: 10px 22px; font-weight: 600; font-size: 0.9rem; display: flex; align-items: center; gap: 8px;">
-                            <span>Rechercher</span>
-                        </button>
-                    </div>
-                </div>
-
                 <!-- Bandeau Filtre Actif -->
                 <div class="active-filters-info" id="active-filters-info" style="display: none; align-items: center; justify-content: space-between; background: rgba(212, 175, 55, 0.1); border: 1px solid var(--accent); border-radius: 8px; padding: 10px 18px; margin: 0 15px 25px 15px;">
                     <span style="font-size: 0.92rem;"><i class="fa-solid fa-filter text-accent"></i> Résultats pour : "<strong id="search-query-text"></strong>"</span>
@@ -335,9 +335,22 @@
 
                         <button class="tab-btn" data-category="parfums">Parfums & Encens</button>
 
+                        <button class="tab-btn" data-category="chaussures">Chaussures & Sandales</button>
+
+                        <button class="tab-btn" data-category="sacs">Sacs & Maroquinerie</button>
+
+                        <button class="tab-btn" data-category="ensembles">Ensembles Sacs & Chaussures</button>
+
                     </div>
 
-
+                    <div class="catalog-view-mode-selector" id="catalog-view-selector" title="Mode d'affichage du catalogue">
+                        <button type="button" class="view-mode-btn active" data-mode="rails" id="btn-view-mode-rails" title="Affichage par rayons (Défilement horizontal & vertical)">
+                            <i class="fa-solid fa-layer-group"></i> <span>Rayons</span>
+                        </button>
+                        <button type="button" class="view-mode-btn" data-mode="grid" id="btn-view-mode-grid" title="Affichage en grille classique">
+                            <i class="fa-solid fa-grip"></i> <span>Grille</span>
+                        </button>
+                    </div>
 
                 </div>
 
@@ -774,9 +787,11 @@
                                                 <option value="Robes Wax">
                                                 <option value="Soins de Beauté">
                                                 <option value="Parfums & Encens">
+                                                <option value="Chaussures & Sandales">
+                                                <option value="Sacs & Maroquinerie">
+                                                <option value="Ensembles Sacs & Chaussures">
                                                 <option value="Accessoires">
                                                 <option value="Bijoux">
-                                                <option value="Sacs & Chaussures">
                                             </datalist>
                                             <small class="form-help" style="display: block; margin-top: 3px; font-size: 0.75rem; color: var(--text-muted);">
                                                 Écrivez librement le nom de la catégorie (ou choisissez une suggestion).
@@ -2635,7 +2650,7 @@
     </div>
 
     <!-- Local Application Javascript -->
-    <script src="app.js?v=24"></script>
+    <script src="app.js?v=27"></script>
 
 </body>
 
