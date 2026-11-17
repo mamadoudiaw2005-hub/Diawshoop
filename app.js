@@ -3029,6 +3029,7 @@ const elements = {
 
 
     authModal: document.getElementById("auth-modal"),
+    loginModal: document.getElementById("auth-modal"),
 
 
 
@@ -3204,6 +3205,7 @@ const elements = {
 
 
 
+    productFormTitle: document.getElementById("product-form-title"),
     productAdminForm: document.getElementById("product-admin-form"),
 
 
@@ -10889,17 +10891,54 @@ if (elements.prodImageFileInput) {
             }
             const reader = new FileReader();
             reader.onload = function (evt) {
-                customImageBase64 = evt.target.result;
-                if (elements.prodImageUrlInput) {
-                    elements.prodImageUrlInput.value = "";
-                    elements.prodImageUrlInput.required = false;
-                }
-                const previewImg = document.getElementById("custom-image-preview");
-                const previewBox = document.getElementById("custom-image-preview-container");
-                if (previewImg && previewBox) {
-                    previewImg.src = customImageBase64;
-                    previewBox.style.display = "flex";
-                }
+                const rawData = evt.target.result;
+                const tempImg = new Image();
+                tempImg.onload = function () {
+                    try {
+                        const maxDim = 1200;
+                        let w = tempImg.width;
+                        let h = tempImg.height;
+                        if (w > maxDim || h > maxDim) {
+                            if (w > h) {
+                                h = Math.round((h * maxDim) / w);
+                                w = maxDim;
+                            } else {
+                                w = Math.round((w * maxDim) / h);
+                                h = maxDim;
+                            }
+                        }
+                        const canvas = document.createElement("canvas");
+                        canvas.width = w;
+                        canvas.height = h;
+                        const ctx = canvas.getContext("2d");
+                        ctx.drawImage(tempImg, 0, 0, w, h);
+                        customImageBase64 = canvas.toDataURL("image/webp", 0.85);
+                    } catch (canvasErr) {
+                        console.warn("Canvas compression fallback:", canvasErr);
+                        customImageBase64 = rawData;
+                    }
+
+                    if (elements.prodImageUrlInput) {
+                        elements.prodImageUrlInput.value = "";
+                        elements.prodImageUrlInput.required = false;
+                    }
+                    const previewImg = document.getElementById("custom-image-preview");
+                    const previewBox = document.getElementById("custom-image-preview-container");
+                    if (previewImg && previewBox) {
+                        previewImg.src = customImageBase64;
+                        previewBox.style.display = "flex";
+                    }
+                };
+                tempImg.onerror = function () {
+                    customImageBase64 = rawData;
+                    const previewImg = document.getElementById("custom-image-preview");
+                    const previewBox = document.getElementById("custom-image-preview-container");
+                    if (previewImg && previewBox) {
+                        previewImg.src = customImageBase64;
+                        previewBox.style.display = "flex";
+                    }
+                };
+                tempImg.src = rawData;
             };
             reader.readAsDataURL(file);
         }
@@ -13568,7 +13607,7 @@ window.editProductInAdmin = function (productId) {
         editPreviewBox.style.display = "flex";
     }
 
-    elements.productFormTitle.textContent = "Modifier le produit";
+    if (elements.productFormTitle) elements.productFormTitle.textContent = "Modifier le produit";
     elements.btnSaveProduct.textContent = "Mettre à jour le produit";
     if (elements.btnCancelEdit) elements.btnCancelEdit.style.display = "block";
 }
@@ -13605,7 +13644,7 @@ function resetAdminForm() {
     if (elements.prodImageFileInput) elements.prodImageFileInput.value = "";
     if (elements.prodVideoFileInput) elements.prodVideoFileInput.value = "";
 
-    elements.productFormTitle.textContent = "Ajouter un nouveau produit";
+    if (elements.productFormTitle) elements.productFormTitle.textContent = "Ajouter un nouveau produit";
 
 
 
@@ -14019,15 +14058,20 @@ elements.productAdminForm.addEventListener("submit", async (e) => {
             showToast(`Article "${escapeHTML(name)}" publié et synchronisé sur Supabase Cloud avec succès !`, "success");
         }
 
-        // Save, refresh tables, reset form
-        localStorage.setItem("diaw_shoop_products", JSON.stringify(products));
-        renderCategoryTabs();
-        renderProductList();
-        renderAdminDashboard();
-        resetAdminForm();
+                // Save, refresh tables, reset form de façon sécurisée et résiliente
+        try {
+            localStorage.setItem("diaw_shoop_products", JSON.stringify(products));
+        } catch (storageErr) {
+            console.warn("Notice quota local storage pour les produits :", storageErr);
+        }
+
+        try { renderCategoryTabs(); } catch (tabErr) { console.warn("Notice renderCategoryTabs :", tabErr); }
+        try { renderProductList(); } catch (listErr) { console.warn("Notice renderProductList :", listErr); }
+        try { renderAdminDashboard(); } catch (adminErr) { console.warn("Notice renderAdminDashboard :", adminErr); }
+        try { resetAdminForm(); } catch (formErr) { console.warn("Notice resetAdminForm :", formErr); }
     } catch (error) {
         console.error("Erreur enregistrement produit :", error);
-        showToast("Une erreur inattendue est survenue.", "error");
+        showToast(error && error.message ? ("Erreur : " + error.message) : "Une erreur inattendue est survenue.", "error");
     } finally {
         elements.btnSaveProduct.textContent = originalBtnText;
         elements.btnSaveProduct.disabled = false;
