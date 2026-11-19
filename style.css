@@ -5415,3 +5415,179 @@ body.dark-mode .view-mode-btn.active {
     70% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
     100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
 }
+
+
+/* ========================================================
+   WAVE PAYMENT INTEGRATION & FLOATING CART PILL STYLES
+   ======================================================== */
+
+.payment-method-card.active[data-method="wave"] {
+    border-color: #1dc4ff !important;
+    background-color: rgba(29, 196, 255, 0.06) !important;
+    box-shadow: 0 4px 15px rgba(0, 153, 229, 0.12);
+}
+
+.payment-method-card[data-method="wave"]:hover {
+    border-color: #0099e5 !important;
+}
+
+/* Floating Actions Container (Cart pill + Scroll to top) */
+.floating-actions-container {
+    position: fixed;
+    bottom: 24px;
+    right: 24px;
+    z-index: 998;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 12px;
+    pointer-events: none;
+}
+
+.btn-scroll-top {
+    pointer-events: auto;
+    width: 44px;
+    height: 44px;
+    border-radius: 50%;
+    background: var(--bg-card, #ffffff);
+    color: var(--primary, #0f172a);
+    border: 1.5px solid var(--border-color);
+    box-shadow: 0 4px 14px rgba(0,0,0,0.12);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1rem;
+    cursor: pointer;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(15px);
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-scroll-top.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0);
+}
+
+.btn-scroll-top:hover {
+    background: var(--accent, #d4af37);
+    color: #0f172a;
+    border-color: var(--accent, #d4af37);
+    transform: translateY(-2px);
+}
+
+.floating-cart-pill {
+    pointer-events: auto;
+    background: #0f172a;
+    color: #ffffff;
+    border: 2px solid var(--accent, #d4af37);
+    border-radius: 50px;
+    padding: 8px 18px 8px 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    box-shadow: 0 8px 25px rgba(0,0,0,0.25), 0 0 15px rgba(212, 175, 55, 0.2);
+    cursor: pointer;
+    opacity: 0;
+    visibility: hidden;
+    transform: translateY(20px) scale(0.95);
+    transition: all 0.28s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.floating-cart-pill.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translateY(0) scale(1);
+}
+
+.floating-cart-pill:hover {
+    transform: translateY(-2px) scale(1.02);
+    box-shadow: 0 12px 30px rgba(0,0,0,0.3), 0 0 20px rgba(212, 175, 55, 0.35);
+    background: #1e293b;
+}
+
+.floating-cart-icon-wrapper {
+    position: relative;
+    width: 38px;
+    height: 38px;
+    background: rgba(212, 175, 55, 0.15);
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent, #d4af37);
+    font-size: 1.1rem;
+}
+
+.floating-cart-badge {
+    position: absolute;
+    top: -4px;
+    right: -4px;
+    background: var(--accent, #d4af37);
+    color: #0f172a;
+    font-size: 0.7rem;
+    font-weight: 800;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border: 1.5px solid #0f172a;
+}
+
+.floating-cart-details {
+    display: flex;
+    flex-direction: column;
+    text-align: left;
+}
+
+.floating-cart-title {
+    font-size: 0.72rem;
+    color: rgba(255, 255, 255, 0.7);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-weight: 600;
+}
+
+.floating-cart-total {
+    font-size: 0.95rem;
+    font-weight: 800;
+    color: var(--accent, #d4af37);
+}
+
+.floating-cart-arrow {
+    font-size: 0.85rem;
+    color: rgba(255, 255, 255, 0.5);
+    transition: transform 0.2s;
+}
+
+.floating-cart-pill:hover .floating-cart-arrow {
+    transform: translateX(3px);
+    color: #ffffff;
+}
+
+/* Ensure sticky header works cleanly on all viewports without overflow-x break */
+html, body {
+    overflow-x: clip !important;
+}
+
+@media (max-width: 768px) {
+    .floating-actions-container {
+        bottom: 16px;
+        right: 14px;
+    }
+    .floating-cart-pill {
+        padding: 6px 14px 6px 10px;
+        gap: 10px;
+    }
+    .floating-cart-icon-wrapper {
+        width: 34px;
+        height: 34px;
+        font-size: 1rem;
+    }
+    .floating-cart-total {
+        font-size: 0.88rem;
+    }
+}

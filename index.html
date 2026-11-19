@@ -22,7 +22,7 @@
 
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
-    <link rel="stylesheet" href="style.css?v=30">
+    <link rel="stylesheet" href="style.css?v=36">
 
     <!-- Google Identity Services SDK for Real Google Sign-In -->
 
@@ -1317,51 +1317,58 @@
 
                                 </div>
 
-                                <div class="form-group">
 
-                                    <label for="settings-google-client-id">ID Client Google OAuth 2.0 (Pour connecter de vrais comptes Google)</label>
 
-                                    <input type="text" id="settings-google-client-id" placeholder="616654931328-e2qe49rge45fulu769pd21gemfhc2ovs.apps.googleusercontent.com">
+                                 <!-- Section Réception des Paiements Wave & Mobile Money -->
+                                  <div class="form-group" style="margin-top: 25px; border-top: 1px solid var(--border-color); padding-top: 20px;">
+                                      <h4 style="margin-bottom: 8px; color: var(--text-color); font-weight: 700; display: flex; align-items: center; gap: 8px;">
+                                          <span style="display:inline-flex; align-items:center; justify-content:center; width:28px; height:28px; background:linear-gradient(135deg, #1dc4ff, #0099e5); color:#fff; border-radius:50%; font-size:0.9rem;"><i class="fa-solid fa-water"></i></span>
+                                          Configuration du Paiement Wave & Réception des Fonds
+                                      </h4>
+                                      <p class="text-muted" style="font-size: 0.82rem; margin-bottom: 15px;">
+                                          Personnalisez le numéro Wave et téléversez votre QR Code officiel pour que vos clients puissent scanner et payer en direct lors de la commande.
+                                      </p>
 
-                                    <small class="form-help">Indiquez l'ID Client de votre projet Google Cloud Console. Par défaut, un ID générique de test est pré-configuré.</small>
+                                      <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 15px; background: rgba(29, 196, 255, 0.08); padding: 10px 14px; border-radius: 8px; border: 1px solid rgba(29, 196, 255, 0.3);">
+                                          <input type="checkbox" id="settings-wave-enabled" checked style="width: 20px; height: 20px; accent-color: #0099e5; cursor: pointer;">
+                                          <label for="settings-wave-enabled" style="font-weight: 700; color: var(--primary); cursor: pointer; margin: 0;">Activer le mode de paiement Wave au Checkout</label>
+                                      </div>
 
-                                </div>
+                                      <div class="form-row">
+                                          <div class="form-group">
+                                              <label for="settings-wave-number">Numéro Wave du Vendeur (Destinataire) *</label>
+                                              <input type="text" id="settings-wave-number" placeholder="Ex: 77 123 45 67">
+                                              <small class="form-help">Numéro Wave sur lequel vous recevez les paiements de vos clients.</small>
+                                          </div>
+                                          <div class="form-group">
+                                              <label for="settings-wave-account-name">Nom du Compte Wave</label>
+                                              <input type="text" id="settings-wave-account-name" placeholder="Ex: DIAW SHOOP">
+                                              <small class="form-help">Nom affiché au client pour lui confirmer le bon destinataire.</small>
+                                          </div>
+                                      </div>
 
-                                 <div class="form-group" style="margin-top: 25px; border-top: 1px solid var(--border-color); padding-top: 20px;">
-
-                                     <h4 style="margin-bottom: 12px; color: var(--text-color); font-weight: 600;">Réception des Transferts de Paiement</h4>
-
-                                     <p class="text-muted" style="font-size: 0.8rem; margin-bottom: 15px;">Configurez le compte / numéro destinataire vers lequel l'argent récolté lors des commandes clients doit être transféré.</p>
-
-                                     <div class="form-row">
-
-                                         <div class="form-group">
-
-                                             <label for="settings-payout-number">Numéro de téléphone destinataire *</label>
-
-                                             <input type="text" id="settings-payout-number" placeholder="Ex: 77 123 45 67">
-
-                                         </div>
-
-                                         <div class="form-group">
-
-                                             <label for="settings-payout-carrier">Opérateur destinataire *</label>
-
-                                             <select id="settings-payout-carrier">
-
-                                                 <option value="wave">Wave Sénégal</option>
-
-                                                 <option value="orange">Orange Money</option>
-
-                                                 <option value="free">Free Money</option>
-
-                                             </select>
-
-                                         </div>
-
-                                     </div>
-
-                                 </div>
+                                      <!-- Upload du QR Code Wave -->
+                                      <div class="form-group" style="margin-top: 10px;">
+                                          <label for="settings-wave-qr-file">Image du QR Code Wave de votre boutique</label>
+                                          <div style="display: flex; gap: 15px; align-items: flex-start; flex-wrap: wrap;">
+                                              <div style="flex: 1; min-width: 240px;">
+                                                  <input type="file" id="settings-wave-qr-file" accept="image/*" class="form-control">
+                                                  <small class="form-help">Téléversez la capture ou l'image de votre QR Code Wave officiel (PNG, JPG, WebP).</small>
+                                                  <div style="margin-top: 8px;">
+                                                      <label for="settings-wave-qr-url" style="font-size: 0.8rem; color: var(--text-muted);">Ou coller un lien direct d'image QR Code :</label>
+                                                      <input type="url" id="settings-wave-qr-url" placeholder="https://..." style="font-size: 0.85rem; padding: 6px 10px;">
+                                                  </div>
+                                              </div>
+                                              <div id="wave-qr-preview-wrapper" style="text-align: center; border: 1.5px dashed var(--border-color); border-radius: 10px; padding: 10px; width: 140px; min-height: 140px; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #fafafa;">
+                                                  <img id="wave-qr-admin-preview" src="assets/wave_qr_placeholder.svg" alt="Aperçu QR Code" style="max-width: 120px; max-height: 120px; border-radius: 8px; object-fit: contain;">
+                                                  <div id="wave-qr-admin-placeholder" style="color: var(--text-muted); font-size: 0.78rem; display: none;">
+                                                      <i class="fa-solid fa-qrcode" style="font-size: 2.2rem; color: #0099e5; margin-bottom: 6px; display: block;"></i>
+                                                      Aucun QR code
+                                                  </div>
+                                              </div>
+                                          </div>
+                                      </div>
+                                  </div>
 
                                   <!-- Section Tarification & Zones de Livraison -->
 
@@ -2085,71 +2092,58 @@
                 <div class="checkout-step-content" id="checkout-step-2">
 
                     <h3>Mode de règlement</h3>
-
-                    <p class="text-muted">Paiement 100% sécurisé et garanti à la livraison</p>
-
+                    <p class="text-muted">Choisissez votre méthode de paiement préférée :</p>
                     
+                    <div class="payment-methods-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; margin-bottom: 20px;">
 
-                    <div class="payment-methods-grid" style="grid-template-columns: 1fr;">
-
-                        <!-- Paiement à la livraison (Unique moyen de règlement) -->
-
-                        <div class="payment-method-card active" data-method="cash" style="border: 2px solid var(--accent); background: #fffcf7; cursor: default;">
-
-                            <div class="method-badge"><i class="fa-solid fa-circle-check"></i></div>
-
-                            <div class="payment-logo-wrapper cash-color">
-
-                                <i class="fa-solid fa-hand-holding-dollar"></i>
-
+                        <!-- Option 1: Paiement à la livraison -->
+                        <div class="payment-method-card active" data-method="cash" id="method-card-cash" style="border: 2px solid var(--accent); background: #fffcf7; cursor: pointer; border-radius: 12px; padding: 18px; transition: all 0.25s ease; position: relative;">
+                            <div class="method-badge" style="color: var(--accent-dark);"><i class="fa-solid fa-circle-check"></i></div>
+                            <div class="payment-logo-wrapper cash-color" style="margin-bottom: 8px;">
+                                <i class="fa-solid fa-hand-holding-dollar" style="font-size: 1.8rem; color: var(--accent-dark);"></i>
                             </div>
-
                             <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
-
-                                <h4 style="margin: 0; font-size: 1.05rem;">Paiement à la livraison (À l'arrivée)</h4>
-
-                                <span style="background: #e6f4ea; color: #137333; font-size: 0.75rem; font-weight: 700; padding: 3px 10px; border-radius: 12px;"><i class="fa-solid fa-shield-halved"></i> 100% Sérénité</span>
-
+                                <h4 style="margin: 0; font-size: 1rem; font-weight: 700; color: var(--primary);">Paiement à la livraison</h4>
+                                <span style="background: #e6f4ea; color: #137333; font-size: 0.72rem; font-weight: 700; padding: 3px 8px; border-radius: 12px;">À l'arrivée</span>
                             </div>
-
-                            <p class="method-desc" style="font-size: 0.88rem; line-height: 1.5; color: var(--text-color); margin-bottom: 10px;">
-
-                                Aucun prépaiement en ligne requis. Vous réglez l'intégralité directement au livreur lors de la réception de vos articles à votre adresse.
-
+                            <p class="method-desc" style="font-size: 0.82rem; line-height: 1.45; color: var(--text-color); margin-bottom: 8px;">
+                                Réglez directement au livreur en espèces lors de la réception de votre colis.
                             </p>
-
-                            <div style="display: flex; gap: 15px; font-size: 0.82rem; color: var(--text-muted); flex-wrap: wrap; padding-top: 8px; border-top: 1px dashed rgba(0,0,0,0.1);">
-
-                                <span><i class="fa-solid fa-check text-success"></i> Règlement à l'arrivée</span>
-
-                                <span><i class="fa-solid fa-check text-success"></i> Aucun prépaiement en ligne</span>
-
-                                <span><i class="fa-solid fa-check text-success"></i> Vérification du colis à la livraison</span>
-
+                            <div style="font-size: 0.75rem; color: var(--text-muted); display: flex; gap: 8px; flex-wrap: wrap;">
+                                <span><i class="fa-solid fa-check text-success"></i> Sérénité 100%</span>
+                                <span><i class="fa-solid fa-check text-success"></i> Contrôle du colis</span>
                             </div>
+                        </div>
 
+                        <!-- Option 2: Paiement Wave -->
+                        <div class="payment-method-card" data-method="wave" id="method-card-wave" style="border: 1.5px solid var(--border-color); background: #ffffff; cursor: pointer; border-radius: 12px; padding: 18px; transition: all 0.25s ease; position: relative;">
+                            <div class="method-badge" style="color: #0099e5; opacity: 0;"><i class="fa-solid fa-circle-check"></i></div>
+                            <div class="payment-logo-wrapper wave-color" style="display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; border-radius: 6px; background: #e0f2fe; margin-bottom: 8px;">
+                                <span class="wave-text" style="color: #0099e5; font-weight: 800; font-size: 1.3rem; font-style: italic;">wave</span>
+                            </div>
+                            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                                <h4 style="margin: 0; font-size: 1rem; font-weight: 700; color: var(--primary);">Paiement Wave</h4>
+                                <span style="background: rgba(29,196,255,0.15); color: #008cc9; font-size: 0.72rem; font-weight: 700; padding: 3px 8px; border-radius: 12px;"><i class="fa-solid fa-bolt"></i> Recommandé</span>
+                            </div>
+                            <p class="method-desc" style="font-size: 0.82rem; line-height: 1.45; color: var(--text-color); margin-bottom: 8px;">
+                                Scannez le QR Code officiel ou transférez directement vers le numéro Wave de la boutique.
+                            </p>
+                            <div style="font-size: 0.75rem; color: #008cc9; display: flex; gap: 8px; flex-wrap: wrap; font-weight: 600;">
+                                <span><i class="fa-solid fa-qrcode"></i> Scan QR Code</span>
+                                <span><i class="fa-solid fa-shield-halved"></i> Zéro frais</span>
+                            </div>
                         </div>
 
                     </div>
 
-
-
                     <div class="payment-amount-summary" style="margin-top: 20px;">
-
-                        <p>Montant total à régler à la livraison : <strong id="checkout-amount-summary">0 FCFA</strong> (Frais de livraison inclus)</p>
-
+                        <p id="checkout-amount-summary-label">Montant total à régler : <strong id="checkout-amount-summary">0 FCFA</strong> (Frais de livraison inclus)</p>
                     </div>
-
-
 
                     <div class="checkout-nav-buttons">
-
                         <button class="btn btn-secondary" id="btn-back-to-step-1"><i class="fa-solid fa-arrow-left"></i> Retour aux coordonnées</button>
-
                         <button class="btn btn-primary" id="btn-proceed-to-sim"><i class="fa-solid fa-arrow-right"></i> Continuer vers la confirmation</button>
-
                     </div>
-
                 </div>
 
 
@@ -2226,6 +2220,94 @@
 
 
 
+                    
+                    <!-- WAVE PAYMENT CONFIRMATION WIZARD -->
+                    <div class="payment-wizard" id="wizard-wave" style="display:none; text-align: center; padding: 10px 0;">
+                        <div class="wave-confirmation-box" style="background: #ffffff; border: 2px solid #1dc4ff; border-radius: 16px; padding: 22px 18px; max-width: 520px; margin: 0 auto; box-shadow: 0 10px 30px rgba(0, 178, 254, 0.12);">
+                            
+                            <!-- Header Wave -->
+                            <div style="display:flex; align-items:center; justify-content:center; gap:10px; margin-bottom:14px;">
+                                <div style="width: 42px; height: 42px; background: linear-gradient(135deg, #1dc4ff, #0099e5); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: #fff; font-size: 1.25rem;">
+                                    <i class="fa-solid fa-water"></i>
+                                </div>
+                                <div style="text-align: left;">
+                                    <h3 style="font-size: 1.25rem; margin: 0; color: #008cc9; font-weight: 800;">Paiement Sécurisé Wave</h3>
+                                    <span style="font-size: 0.78rem; color: var(--text-muted);">Transfert instantané & QR Code officiel</span>
+                                </div>
+                            </div>
+
+                            <!-- Montant exact à régler -->
+                            <div style="background: linear-gradient(135deg, rgba(29,196,255,0.1), rgba(0,153,229,0.04)); border: 1.5px solid #1dc4ff; border-radius: 12px; padding: 14px 18px; margin-bottom: 18px;">
+                                <div style="font-size: 0.8rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 700;">Montant exact à payer par Wave</div>
+                                <div style="display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 4px;">
+                                    <span id="wave-amount-confirm" style="font-size: 1.85rem; font-weight: 900; color: #0077aa; letter-spacing: -0.5px;">0 FCFA</span>
+                                    <button type="button" class="btn-copy-small" onclick="copyWaveAmount()" title="Copier le montant" style="background: #ffffff; border: 1px solid #1dc4ff; color: #008cc9; padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; cursor: pointer; font-weight: 700; display: inline-flex; align-items: center; gap: 4px;">
+                                        <i class="fa-regular fa-copy"></i> Copier
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- QR Code & Instructions de Scan -->
+                            <div style="background: #fafcff; border: 1px solid #e0f2fe; border-radius: 12px; padding: 16px; margin-bottom: 16px;">
+                                <div style="font-weight: 700; font-size: 0.92rem; color: var(--primary); margin-bottom: 6px;">
+                                    <i class="fa-solid fa-qrcode" style="color: #0099e5;"></i> Option 1 : Scannez le QR Code Wave
+                                </div>
+                                <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 12px;">Ouvrez l'application <strong>Wave</strong> sur votre téléphone et scannez ce code pour valider le paiement :</p>
+                                
+                                <div style="display: inline-block; padding: 10px; background: #ffffff; border: 2px solid #1dc4ff; border-radius: 12px; box-shadow: 0 4px 15px rgba(0,0,0,0.06); margin-bottom: 8px;">
+                                    <img id="wave-qr-display-img" src="assets/wave_qr_placeholder.svg" alt="QR Code Wave Vendeur" style="width: 170px; height: 170px; object-fit: contain; display: block; margin: 0 auto; border-radius: 8px;">
+                                </div>
+                                <div style="font-size: 0.75rem; color: var(--text-muted);">
+                                    <i class="fa-solid fa-shield-halved text-success"></i> QR Code officiel certifié DIAW SHOOP
+                                </div>
+                            </div>
+
+                            <!-- Numéro de Transfert Direct -->
+                            <div style="background: #fafcff; border: 1px solid #e0f2fe; border-radius: 12px; padding: 16px; margin-bottom: 16px; text-align: left;">
+                                <div style="font-weight: 700; font-size: 0.92rem; color: var(--primary); margin-bottom: 8px;">
+                                    <i class="fa-solid fa-mobile-screen-button" style="color: #0099e5;"></i> Option 2 : Ou transférez au numéro du vendeur
+                                </div>
+                                
+                                <div style="display: flex; align-items: center; justify-content: space-between; background: #ffffff; border: 1.5px solid #1dc4ff; border-radius: 10px; padding: 10px 14px; margin-bottom: 8px; flex-wrap: wrap; gap: 8px;">
+                                    <div>
+                                        <div style="font-size: 0.75rem; color: var(--text-muted);">Numéro Wave de la Boutique :</div>
+                                        <strong id="wave-vendor-number-display" style="font-size: 1.15rem; color: #0077aa; letter-spacing: 1px;">77 123 45 67</strong>
+                                        <div id="wave-vendor-name-display" style="font-size: 0.78rem; color: var(--text-muted); font-weight: 600;">Destinataire : DIAW SHOOP</div>
+                                    </div>
+                                    <div>
+                                        <button type="button" id="btn-copy-wave-number" class="btn btn-sm" onclick="copyWaveVendorNumber()" style="background: #0099e5; color: #fff; border: none; padding: 9px 18px; border-radius: 6px; font-weight: 700; font-size: 0.85rem; cursor: pointer; display: flex; align-items: center; gap: 6px;">
+                                            <i class="fa-regular fa-copy"></i> <span>Copier le numéro</span>
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Champs de confirmation client -->
+                            <div style="background: #ffffff; border: 1px solid var(--border-color); border-radius: 12px; padding: 16px; margin-bottom: 18px; text-align: left;">
+                                <div style="font-weight: 700; font-size: 0.9rem; color: var(--primary); margin-bottom: 8px;">
+                                    <i class="fa-solid fa-user-check text-accent"></i> Vos coordonnées de paiement Wave :
+                                </div>
+                                <div class="form-group" style="margin-bottom: 10px;">
+                                    <label for="wave-client-sender-phone" style="font-size: 0.82rem; font-weight: 600;">Votre numéro de téléphone Wave expéditeur *</label>
+                                    <input type="tel" id="wave-client-sender-phone" required placeholder="Ex: 77 987 65 43" style="font-size: 0.95rem; padding: 10px;">
+                                    <small class="form-help">Le numéro avec lequel vous venez d'effectuer le transfert Wave.</small>
+                                </div>
+                                <div class="form-group" style="margin-bottom: 0;">
+                                    <label for="wave-client-tx-ref" style="font-size: 0.82rem; font-weight: 600;">ID ou référence de la transaction Wave (Optionnel)</label>
+                                    <input type="text" id="wave-client-tx-ref" placeholder="Ex: W-82914838..." style="padding: 10px;">
+                                </div>
+                            </div>
+
+                            <button class="btn btn-primary btn-block" id="btn-wave-confirm-order" style="padding: 15px; font-size: 1rem; font-weight: 800; background: linear-gradient(135deg, #0099e5, #0077aa); border: none; box-shadow: 0 4px 15px rgba(0,153,229,0.35); border-radius: 8px; cursor: pointer;">
+                                <i class="fa-solid fa-circle-check"></i> J'AI PAYÉ PAR WAVE - VALIDER MA COMMANDE
+                            </button>
+
+                            <p style="font-size: 0.78rem; color: var(--text-muted); margin-top: 12px; line-height: 1.4; margin-bottom: 0;">
+                                <i class="fa-brands fa-whatsapp text-success"></i> Vous serez automatiquement redirigé vers le compte WhatsApp de la boutique avec votre reçu pour confirmation immédiate par le vendeur.
+                            </p>
+                        </div>
+                    </div>
+
                     <div class="transaction-loader-wrapper" id="transaction-loader" style="display:none; text-align: center; padding: 30px 0;">
 
                         <div class="spinner accent-spinner" style="margin: 0 auto 15px auto;"></div>
@@ -2255,13 +2337,9 @@
                     <div class="invoice-container">
 
                         <div class="invoice-header-stamp">
-
-                            <i class="fa-solid fa-circle-check success-icon"></i>
-
+                            <i class="fa-solid fa-circle-check success-icon" id="checkout-complete-icon"></i>
                             <h2>Merci pour votre commande !</h2>
-
-                            <p>Votre commande a été enregistrée avec succès. Vous réglerez directement à la livraison.</p>
-
+                            <p id="checkout-complete-subtitle">Votre commande a été enregistrée avec succès. Vous réglerez directement à la livraison.</p>
                         </div>
 
 
@@ -2440,6 +2518,25 @@
 
 
     <!-- Global Floating Notifications (Toast Alert) -->
+
+    
+    <!-- Bouton Flottant d'Accès Rapide au Panier & Retour en Haut -->
+    <div class="floating-actions-container" id="floating-actions-container">
+        <button type="button" class="btn-scroll-top" id="btn-scroll-top" title="Retour en haut" aria-label="Retour en haut">
+            <i class="fa-solid fa-arrow-up"></i>
+        </button>
+        <button type="button" class="floating-cart-pill" id="floating-cart-pill" title="Voir mon panier" aria-label="Voir mon panier">
+            <div class="floating-cart-icon-wrapper">
+                <i class="fa-solid fa-bag-shopping"></i>
+                <span class="floating-cart-badge" id="floating-cart-badge">0</span>
+            </div>
+            <div class="floating-cart-details">
+                <span class="floating-cart-title">Mon Panier</span>
+                <span class="floating-cart-total" id="floating-cart-total">0 FCFA</span>
+            </div>
+            <i class="fa-solid fa-chevron-right floating-cart-arrow"></i>
+        </button>
+    </div>
 
     <div class="toast-container" id="toast-container"></div>
 
@@ -2650,7 +2747,7 @@
     </div>
 
     <!-- Local Application Javascript -->
-    <script src="app.js?v=30"></script>
+    <script src="app.js?v=36"></script>
 
 </body>
 

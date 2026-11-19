@@ -1,0 +1,104 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 300" width="300" height="300">
+  <defs>
+    <linearGradient id="waveGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1dc4ff"/>
+      <stop offset="100%" stop-color="#0099e5"/>
+    </linearGradient>
+    <filter id="shadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-opacity="0.15"/>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="300" height="300" rx="20" fill="#ffffff" filter="url(#shadow)"/>
+  <rect x="8" y="8" width="284" height="284" rx="16" fill="none" stroke="#1dc4ff" stroke-width="3" stroke-dasharray="8 6"/>
+
+  <!-- Corner Finder Patterns -->
+  <!-- Top Left -->
+  <rect x="25" y="25" width="60" height="60" rx="8" fill="#0099e5"/>
+  <rect x="35" y="35" width="40" height="40" rx="4" fill="#ffffff"/>
+  <rect x="43" y="43" width="24" height="24" rx="3" fill="#0099e5"/>
+
+  <!-- Top Right -->
+  <rect x="215" y="25" width="60" height="60" rx="8" fill="#0099e5"/>
+  <rect x="225" y="35" width="40" height="40" rx="4" fill="#ffffff"/>
+  <rect x="233" y="43" width="24" height="24" rx="3" fill="#0099e5"/>
+
+  <!-- Bottom Left -->
+  <rect x="25" y="215" width="60" height="60" rx="8" fill="#0099e5"/>
+  <rect x="35" y="225" width="40" height="40" rx="4" fill="#ffffff"/>
+  <rect x="43" y="233" width="24" height="24" rx="3" fill="#0099e5"/>
+
+  <!-- Stylized Matrix Pixels -->
+  <rect x="100" y="30" width="14" height="14" rx="3" fill="#1dc4ff"/>
+  <rect x="122" y="30" width="14" height="14" rx="3" fill="#0099e5"/>
+  <rect x="144" y="30" width="14" height="14" rx="3" fill="#1dc4ff"/>
+  <rect x="166" y="30" width="14" height="14" rx="3" fill="#0099e5"/>
+  <rect x="188" y="30" width="14" height="14" rx="3" fill="#1dc4ff"/>
+
+  <rect x="100" y="52" width="14" height="14" rx="3" fill="#0099e5"/>
+  <rect x="144" y="52" width="14" height="14" rx="3" fill="#1dc4ff"/>
+  <rect x="188" y="52" width="14" height="14" rx="3" fill="#0099e5"/>
+
+  <rect x="100" y="74" width="14" height="14" rx="3" fill="#1dc4ff"/>
+  <rect x="122" y="74" width="14" height="14" rx="3" fill="#0099e5"/>
+  <rect x="166" y="74" width="14" height="14" rx="3" fill="#1dc4ff"/>
+
+  <!-- Middle section -->
+  <rect x="30" y="100" width="14" height="14" rx="3" fill="#0099e5"/>
+  <rect x="52" y="100" width="14" height="14" rx="3" fill="#1dc4ff"/>
+  <rect x="74" y="100" width="14" height="14" rx="3" fill="#0099e5"/>
+  <rect x="215" y="100" width="14" height="14" rx="3" fill="#1dc4ff"/>
+  <rect x="237" y="100" width="14" height="14" rx="3" fill="#0099e5"/>
+  <rect x="259" y="100" width="14" height="14" rx="3" fill="#1dc4ff"/>
+
+  <rect x="30" y="122" width="14" height="14" rx="3" fill="#1dc4ff"/>
+  <rect x="74" y="122" width="14" height="14" rx="3" fill="#0099e5"/>
+  <rect x="215" y="122" width="14" height="14" rx="3" fill="#0099e5"/>
+  <rect x="259" y="122" width="14" height="14" rx="3" fill="#1dc4ff"/>
+
+  <rect x="30" y="144" width="14" height="14" rx="3" fill="#0099e5"/>
+  <rect x="52" y="144" width="14" height="14" rx="3" fill="#1dc4ff"/>
+  <rect x="237" y="144" width="14" height="14" rx="3" fill="#0099e5"/>
+
+  <rect x="30" y="166" width="14" height="14" rx="3" fill="#1dc4ff"/>
+  <rect x="74" y="166" width="14" height="14" rx="3" fill="#0099e5"/>
+  <rect x="215" y="166" width="14" height="14" rx="3" fill="#1dc4ff"/>
+  <rect x="259" y="166" width="14" height="14" rx="3" fill="#0099e5"/>
+
+  <rect x="30" y="188" width="14" height="14" rx="3" fill="#0099e5"/>
+  <rect x="52" y="188" width="14" height="14" rx="3" fill="#1dc4ff"/>
+  <rect x="74" y="188" width="14" height="14" rx="3" fill="#0099e5"/>
+  <rect x="215" y="188" width="14" height="14" rx="3" fill="#0099e5"/>
+  <rect x="237" y="188" width="14" height="14" rx="3" fill="#1dc4ff"/>
+  <rect x="259" y="188" width="14" height="14" rx="3" fill="#0099e5"/>
+
+  <!-- Bottom section -->
+  <rect x="100" y="215" width="14" height="14" rx="3" fill="#0099e5"/>
+  <rect x="122" y="215" width="14" height="14" rx="3" fill="#1dc4ff"/>
+  <rect x="144" y="215" width="14" height="14" rx="3" fill="#0099e5"/>
+  <rect x="166" y="215" width="14" height="14" rx="3" fill="#1dc4ff"/>
+  <rect x="188" y="215" width="14" height="14" rx="3" fill="#0099e5"/>
+  <rect x="215" y="215" width="14" height="14" rx="3" fill="#1dc4ff"/>
+  <rect x="245" y="215" width="14" height="14" rx="3" fill="#0099e5"/>
+
+  <rect x="100" y="237" width="14" height="14" rx="3" fill="#1dc4ff"/>
+  <rect x="144" y="237" width="14" height="14" rx="3" fill="#0099e5"/>
+  <rect x="188" y="237" width="14" height="14" rx="3" fill="#1dc4ff"/>
+  <rect x="230" y="237" width="14" height="14" rx="3" fill="#0099e5"/>
+
+  <rect x="100" y="259" width="14" height="14" rx="3" fill="#0099e5"/>
+  <rect x="122" y="259" width="14" height="14" rx="3" fill="#1dc4ff"/>
+  <rect x="166" y="259" width="14" height="14" rx="3" fill="#0099e5"/>
+  <rect x="215" y="259" width="14" height="14" rx="3" fill="#1dc4ff"/>
+  <rect x="250" y="259" width="14" height="14" rx="3" fill="#0099e5"/>
+
+  <!-- Center Wave Badge -->
+  <circle cx="150" cy="150" r="38" fill="#ffffff" filter="url(#shadow)"/>
+  <circle cx="150" cy="150" r="32" fill="url(#waveGrad)"/>
+  
+  <!-- Wave Penguin & Typography Silhouette -->
+  <text x="150" y="146" text-anchor="middle" font-family="'Outfit', 'Segoe UI', Arial, sans-serif" font-weight="900" font-size="20" fill="#ffffff" font-style="italic" letter-spacing="-0.5">wave</text>
+  <path d="M142,156 Q150,152 158,156 Q150,162 142,156 Z" fill="#ffffff"/>
+  <circle cx="150" cy="162" r="2.5" fill="#ffffff"/>
+</svg>

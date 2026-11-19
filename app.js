@@ -5394,6 +5394,10 @@ async function loadSettingsFromSupabase() {
 
 
                 payoutCarrier: cloudSettings.payout_carrier || current.payoutCarrier,
+            waveEnabled,
+            waveNumber,
+            waveAccountName,
+            waveQrCodeImage,
 
 
 
@@ -6811,6 +6815,7 @@ function renderCart() {
 
 
     elements.cartBadge.textContent = totalItems;
+    try { updateFloatingCartUI(); } catch (e) {}
     if (elements.cartBadge.classList) {
         elements.cartBadge.classList.remove("badge-pulse");
         void elements.cartBadge.offsetWidth;
@@ -7831,23 +7836,47 @@ function setCheckoutStep(stepNumber) {
         currentStepEl.style.display = "block";
     }
 
-    // Protection dédiée pour l'étape 3 (Confirmation commande à la livraison)
+    // Mise à jour visuelle pour l'étape 2 (Résumé montant & bouton dynamique)
+    if (stepNumber === 2) {
+        if (!selectedPaymentMethod) selectedPaymentMethod = "cash";
+        checkoutDetails.paymentMethod = selectedPaymentMethod;
+        try { updateStep2PaymentUI(); } catch (e) {}
+    }
+
+    // Bascule dédiée pour l'étape 3 : Paiement Wave vs Paiement à la livraison
     if (stepNumber === 3) {
         const wizardCash = document.getElementById("wizard-cash");
-        if (wizardCash) wizardCash.style.display = "block";
-
+        const wizardWave = document.getElementById("wizard-wave");
         const simNav = document.getElementById("sim-nav-buttons");
-        if (simNav) simNav.style.display = "flex";
-
         const loader = document.getElementById("transaction-loader");
         if (loader) loader.style.display = "none";
 
-        const cashAmountConfirm = document.getElementById("cash-amount-confirm");
-        if (cashAmountConfirm && typeof checkoutDetails !== "undefined" && checkoutDetails) {
-            const confirmedTotal = checkoutDetails.total || 
-                ((checkoutDetails.subtotal || 0) + (checkoutDetails.shippingCost || 0)) ||
-                (cart || []).reduce((sum, it) => sum + (Number(it.price) * (it.qty || 1)), 0);
-            cashAmountConfirm.textContent = `${Number(confirmedTotal).toLocaleString("fr-FR")} FCFA`;
+        const total = checkoutDetails.total || 
+            ((checkoutDetails.subtotal || 0) + (checkoutDetails.shippingCost || 0)) ||
+            (cart || []).reduce((sum, it) => sum + (Number(it.price) * (it.qty || 1)), 0);
+        const totalFormatted = Number(total).toLocaleString("fr-FR") + " FCFA";
+
+        if (selectedPaymentMethod === "wave") {
+            // Afficher uniquement Wave
+            if (wizardCash) wizardCash.style.display = "none";
+            if (simNav) simNav.style.display = "none";
+            if (wizardWave) wizardWave.style.display = "block";
+
+            const waveAmountConfirm = document.getElementById("wave-amount-confirm");
+            if (waveAmountConfirm) waveAmountConfirm.textContent = totalFormatted;
+
+            const clientSenderInput = document.getElementById("wave-client-sender-phone");
+            if (clientSenderInput && !clientSenderInput.value && checkoutDetails.phone) {
+                clientSenderInput.value = checkoutDetails.phone;
+            }
+        } else {
+            // Afficher uniquement Espèces à la livraison
+            if (wizardWave) wizardWave.style.display = "none";
+            if (wizardCash) wizardCash.style.display = "block";
+            if (simNav) simNav.style.display = "flex";
+
+            const cashAmountConfirm = document.getElementById("cash-amount-confirm");
+            if (cashAmountConfirm) cashAmountConfirm.textContent = totalFormatted;
         }
     }
 
@@ -8071,9 +8100,162 @@ elements.btnBackToStep2.addEventListener("click", () => {
 
 
 
+
+// Listener pour l'upload du QR Code Wave avec compression Canvas
+const waveQrFileInput = document.getElementById("settings-wave-qr-file");
+if (waveQrFileInput) {
+    waveQrFileInput.addEventListener("change", function (e) {
+        const file = e.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = function (evt) {
+                const raw = evt.target.result;
+                const img = new Image();
+                img.onload = function () {
+                    try {
+                        const maxDim = 800;
+                        let w = img.width;
+                        let h = img.height;
+                        if (w > maxDim || h > maxDim) {
+                            if (w > h) {
+                                h = Math.round((h * maxDim) / w);
+                                w = maxDim;
+                            } else {
+                                w = Math.round((w * maxDim) / h);
+                                h = maxDim;
+                            }
+                        }
+                        const canvas = document.createElement("canvas");
+                        canvas.width = w;
+                        canvas.height = h;
+                        const ctx = canvas.getContext("2d");
+                        ctx.drawImage(img, 0, 0, w, h);
+                        customWaveQrBase64 = canvas.toDataURL("image/webp", 0.85);
+                    } catch (err) {
+                        customWaveQrBase64 = raw;
+                    }
+                    const preview = document.getElementById("wave-qr-admin-preview");
+                    const placeholder = document.getElementById("wave-qr-admin-placeholder");
+                    if (preview) {
+                        preview.src = customWaveQrBase64;
+                        preview.style.display = "block";
+                        if (placeholder) placeholder.style.display = "none";
+                    }
+                };
+                img.onerror = function () {
+                    customWaveQrBase64 = raw;
+                    const preview = document.getElementById("wave-qr-admin-preview");
+                    if (preview) {
+                        preview.src = customWaveQrBase64;
+                        preview.style.display = "block";
+                    }
+                };
+                img.src = raw;
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+}
+
+const waveQrUrlInput = document.getElementById("settings-wave-qr-url");
+if (waveQrUrlInput) {
+    waveQrUrlInput.addEventListener("input", function () {
+        const url = this.value.trim();
+        const preview = document.getElementById("wave-qr-admin-preview");
+        const placeholder = document.getElementById("wave-qr-admin-placeholder");
+        if (url && preview) {
+            customWaveQrBase64 = url;
+            preview.src = url;
+            preview.style.display = "block";
+            if (placeholder) placeholder.style.display = "none";
+        }
+    });
+}
+
+
+
+// ========================================================
+// CHECKOUT STEP 2 & 3 PAYMENT METHOD SWITCHER (CASH vs WAVE)
+// ========================================================
+
+selectedPaymentMethod = "cash";
+
+function updateStep2PaymentUI() {
+    const summaryLabel = document.getElementById("checkout-amount-summary-label");
+    const amountEl = document.getElementById("checkout-amount-summary");
+    const amountText = amountEl ? amountEl.textContent : "0 FCFA";
+    const btnProceed = document.getElementById("btn-proceed-to-sim");
+
+    if (selectedPaymentMethod === "wave") {
+        if (summaryLabel) {
+            summaryLabel.innerHTML = 'Montant total à payer par Wave : <strong id="checkout-amount-summary">' + amountText + '</strong> (Frais de livraison inclus)';
+        }
+        if (btnProceed) {
+            btnProceed.innerHTML = '<i class="fa-solid fa-arrow-right"></i> Continuer vers le paiement Wave';
+        }
+    } else {
+        if (summaryLabel) {
+            summaryLabel.innerHTML = 'Montant total à régler à la livraison : <strong id="checkout-amount-summary">' + amountText + '</strong> (Frais de livraison inclus)';
+        }
+        if (btnProceed) {
+            btnProceed.innerHTML = '<i class="fa-solid fa-arrow-right"></i> Continuer vers la confirmation';
+        }
+    }
+}
+
+function initPaymentMethodSelector() {
+    const cashCard = document.getElementById("method-card-cash");
+    const waveCard = document.getElementById("method-card-wave");
+
+    if (cashCard) {
+        cashCard.addEventListener("click", () => {
+            selectedPaymentMethod = "cash";
+            checkoutDetails.paymentMethod = "cash";
+            cashCard.classList.add("active");
+            cashCard.style.borderColor = "var(--accent)";
+            cashCard.style.background = "#fffcf7";
+            const badge = cashCard.querySelector(".method-badge");
+            if (badge) badge.style.opacity = "1";
+
+            if (waveCard) {
+                waveCard.classList.remove("active");
+                waveCard.style.borderColor = "var(--border-color)";
+                waveCard.style.background = "#ffffff";
+                const waveBadge = waveCard.querySelector(".method-badge");
+                if (waveBadge) waveBadge.style.opacity = "0";
+            }
+            updateStep2PaymentUI();
+        });
+    }
+
+    if (waveCard) {
+        waveCard.addEventListener("click", () => {
+            selectedPaymentMethod = "wave";
+            checkoutDetails.paymentMethod = "wave";
+            waveCard.classList.add("active");
+            waveCard.style.borderColor = "#1dc4ff";
+            waveCard.style.background = "rgba(29, 196, 255, 0.06)";
+            const waveBadge = waveCard.querySelector(".method-badge");
+            if (waveBadge) waveBadge.style.opacity = "1";
+
+            if (cashCard) {
+                cashCard.classList.remove("active");
+                cashCard.style.borderColor = "var(--border-color)";
+                cashCard.style.background = "#ffffff";
+                const badge = cashCard.querySelector(".method-badge");
+                if (badge) badge.style.opacity = "0";
+            }
+            updateStep2PaymentUI();
+        });
+    }
+}
+initPaymentMethodSelector();
+
 elements.btnProceedToSim.addEventListener("click", () => {
-    selectedPaymentMethod = "cash";
-    checkoutDetails.paymentMethod = "cash";
+    if (!selectedPaymentMethod) {
+        selectedPaymentMethod = "cash";
+    }
+    checkoutDetails.paymentMethod = selectedPaymentMethod;
 
     // Re-synchronisation de sécurité des articles et du montant total
     if (!checkoutDetails.items || checkoutDetails.items.length === 0) {
@@ -8827,6 +9009,30 @@ function finalizeOnlineOrder(transactionId, paymentMethodUsed) {
 
 
 
+
+// Handler pour la confirmation de paiement Wave
+const btnWaveConfirmOrder = document.getElementById("btn-wave-confirm-order");
+if (btnWaveConfirmOrder) {
+    btnWaveConfirmOrder.addEventListener("click", () => {
+        const senderPhoneInput = document.getElementById("wave-client-sender-phone");
+        const senderPhone = senderPhoneInput ? senderPhoneInput.value.trim() : "";
+        if (!senderPhone || senderPhone.replace(/\D/g, '').length < 7) {
+            showToast("Veuillez renseigner votre numéro de téléphone Wave expéditeur valide.", "warning");
+            if (senderPhoneInput) senderPhoneInput.focus();
+            return;
+        }
+
+        checkoutDetails.paymentMethod = "wave";
+        checkoutDetails.waveSenderPhone = senderPhone;
+        const txRefInput = document.getElementById("wave-client-tx-ref");
+        checkoutDetails.waveTransactionId = txRefInput ? txRefInput.value.trim() : "";
+
+        const refCode = "WAVE_" + Math.random().toString(36).substr(2, 6).toUpperCase();
+        executeSimulatedTransaction(refCode);
+    });
+}
+
+
 const btnCashConfirmOrder = document.getElementById("btn-cash-confirm-order");
 
 
@@ -8862,6 +9068,8 @@ if (btnCashConfirmOrder) {
 function executeSimulatedTransaction(referenceCode) {
     const wizardCash = document.getElementById("wizard-cash");
     if (wizardCash) wizardCash.style.display = "none";
+    const wizardWave = document.getElementById("wizard-wave");
+    if (wizardWave) wizardWave.style.display = "none";
     if (elements.simNavButtons) elements.simNavButtons.style.display = "none";
     if (elements.transactionLoader) elements.transactionLoader.style.display = "flex";
 
@@ -8881,6 +9089,10 @@ function executeSimulatedTransaction(referenceCode) {
             const orderShipping = checkoutDetails.shippingCost || 0;
             const orderTotal = checkoutDetails.total || (orderSubtotal + orderShipping);
 
+            const isWaveOrder = (checkoutDetails.paymentMethod === "wave");
+            const orderPaymentMethod = isWaveOrder ? "Paiement Wave" : "Paiement à la livraison";
+            const orderStatus = isWaveOrder ? "Reçue (En attente de confirmation Wave)" : "Reçue (Paiement à la livraison)";
+
             createdOrder = {
                 id: orderId,
                 date: orderDate,
@@ -8894,9 +9106,11 @@ function executeSimulatedTransaction(referenceCode) {
                 subtotal: orderSubtotal,
                 shippingCost: orderShipping,
                 total: orderTotal,
-                paymentMethod: "Paiement à la livraison",
+                paymentMethod: orderPaymentMethod,
                 reference: referenceCode,
-                status: "Reçue (Paiement à la livraison)"
+                status: orderStatus,
+                waveSenderPhone: isWaveOrder ? (checkoutDetails.waveSenderPhone || "") : null,
+                waveTransactionId: isWaveOrder ? (checkoutDetails.waveTransactionId || "") : null
             };
 
             activeCompletedOrder = createdOrder;
@@ -9008,6 +9222,17 @@ function renderInvoiceTicket(order) {
     if (!order) return;
     activeCompletedOrder = order;
 
+    const isWave = (order.paymentMethod === "Paiement Wave" || order.paymentMethod === "wave" || (order.status && order.status.includes("Wave")));
+
+    const subtitleEl = document.getElementById("checkout-complete-subtitle");
+    if (subtitleEl) {
+        if (isWave) {
+            subtitleEl.innerHTML = "Votre commande a été enregistrée avec succès. Votre paiement Wave est en cours de vérification par le vendeur.";
+        } else {
+            subtitleEl.innerHTML = "Votre commande a été enregistrée avec succès. Vous réglerez directement à la livraison.";
+        }
+    }
+
     let itemsRowsHtml = "";
     (order.items || []).forEach(it => {
         const displaySize = (!it.size || it.size === "U" || it.size === "none") ? "" : ` (${it.size})`;
@@ -9030,29 +9255,53 @@ function renderInvoiceTicket(order) {
             </div>`;
     
     // Message WhatsApp officiel prérempli
-    const waText = encodeURIComponent(
-        `Bonjour ${shopName} ! Je viens de valider ma commande #${order.id}.
-
-` +
-        `- *Destinataire* : ${order.clientName}
-` +
-        `- *Téléphone* : +221 ${order.clientPhone}
-` +
-        `- *Adresse* : ${order.clientAddress}
-` +
-        `- *Montant à régler* : ${Number(order.total).toLocaleString("fr-FR")} FCFA
-
-` +
-        `Merci de me confirmer la livraison de mon colis !`
-    );
+    let waText = "";
+    if (isWave) {
+        waText = encodeURIComponent(
+            `Bonjour ${shopName} ! Je viens d'effectuer mon paiement Wave pour ma commande #${order.id}.\n\n` +
+            `🌊 *DÉTAILS DU PAIEMENT WAVE* :\n` +
+            `- *Montant payé* : ${Number(order.total).toLocaleString("fr-FR")} FCFA\n` +
+            `- *Numéro Wave expéditeur* : +221 ${order.waveSenderPhone || order.clientPhone}\n` +
+            (order.waveTransactionId ? `- *ID / Réf Transaction* : ${order.waveTransactionId}\n` : ``) +
+            `- *Référence commande* : ${order.reference || order.id}\n\n` +
+            `📦 *DÉTAILS DE LIVRAISON* :\n` +
+            `- *Client* : ${order.clientName}\n` +
+            `- *Téléphone* : +221 ${order.clientPhone}\n` +
+            `- *Adresse* : ${order.clientAddress}\n\n` +
+            `J'ai effectué le transfert Wave. Merci de vérifier sur votre application Wave et de confirmer la préparation de mon colis !`
+        );
+    } else {
+        waText = encodeURIComponent(
+            `Bonjour ${shopName} ! Je viens de valider ma commande #${order.id}.\n\n` +
+            `- *Destinataire* : ${order.clientName}\n` +
+            `- *Téléphone* : +221 ${order.clientPhone}\n` +
+            `- *Adresse* : ${order.clientAddress}\n` +
+            `- *Montant à régler* : ${Number(order.total).toLocaleString("fr-FR")} FCFA\n\n` +
+            `Merci de me confirmer la livraison de mon colis !`
+        );
+    }
     const waUrl = `https://wa.me/${waPhone}?text=${waText}`;
 
     if (elements.invoiceReceiptDetails) {
         elements.invoiceReceiptDetails.innerHTML = `
+            ${isWave ? `
+            <div style="background: rgba(0, 153, 229, 0.08); border: 2px solid #0099e5; border-radius: 10px; padding: 14px; margin-bottom: 18px; text-align: center;">
+                <div style="font-size: 1.15rem; color: #0077aa; font-weight: 800; margin-bottom: 4px;">
+                    <i class="fa-solid fa-water"></i> PAIEMENT WAVE ENVOYÉ
+                </div>
+                <div style="font-size: 0.85rem; color: var(--text-color); margin-bottom: 8px;">
+                    Votre commande a bien été enregistrée. Statut : <strong>En attente de confirmation Wave</strong>.
+                </div>
+                <div style="font-size: 0.8rem; color: var(--text-muted); background: #ffffff; border-radius: 6px; padding: 6px 10px; display: inline-block;">
+                    Expéditeur Wave : <strong>+221 ${escapeHTML(order.waveSenderPhone || order.clientPhone)}</strong>
+                </div>
+            </div>
+            ` : `
             <div style="background: rgba(34, 197, 94, 0.1); border: 1.5px solid #22c55e; border-radius: 8px; padding: 12px; margin-bottom: 18px; text-align: center;">
                 <div style="font-size: 1.25rem; color: #16a34a; font-weight: 800; margin-bottom: 4px;"><i class="fa-solid fa-circle-check"></i> COMMANDE CONFIRMÉE</div>
                 <div style="font-size: 0.85rem; color: var(--text-color);">Votre commande a bien été enregistrée et transmise à notre service de livraison.</div>
             </div>
+            `}
 
             ${shopLogoHeaderHtml}
 
@@ -9096,18 +9345,22 @@ function renderInvoiceTicket(order) {
                 <span>Frais de livraison (${(order.shippingCost || 0) === 0 ? 'Offerts' : 'Standard'}) :</span>
                 <span>${(order.shippingCost || 0) === 0 ? 'GRATUIT' : (order.shippingCost || 0).toLocaleString("fr-FR") + ' F'}</span>
             </div>
-            <div class="invoice-row total" style="background: rgba(212, 175, 55, 0.12); padding: 12px; border-radius: 6px; margin: 12px 0;">
-                <span style="font-size: 1.05rem; font-weight: 800;">TOTAL À RÉGLER AU LIVREUR :</span>
-                <span style="font-size: 1.25rem; font-weight: 800; color: var(--accent-dark);">${Number(order.total).toLocaleString("fr-FR")} FCFA</span>
+            <div class="invoice-row total" style="background: ${isWave ? 'rgba(0, 153, 229, 0.1)' : 'rgba(212, 175, 55, 0.12)'}; padding: 12px; border-radius: 6px; margin: 12px 0;">
+                <span style="font-size: 1.05rem; font-weight: 800;">${isWave ? 'TOTAL PAYÉ PAR WAVE :' : 'TOTAL À RÉGLER AU LIVREUR :'}</span>
+                <span style="font-size: 1.25rem; font-weight: 800; color: ${isWave ? '#0077aa' : 'var(--accent-dark)'};">${Number(order.total).toLocaleString("fr-FR")} FCFA</span>
             </div>
             <div class="invoice-row" style="font-size: 0.8rem; color: var(--text-muted); margin-bottom: 18px;">
                 <span>Règlement : ${order.paymentMethod}</span>
-                <span style="color:#16a34a; font-weight:600;"><i class="fa-solid fa-truck-fast"></i> En cours de préparation</span>
+                ${isWave ? `
+                <span style="color:#008cc9; font-weight:700;"><i class="fa-solid fa-clock"></i> En attente confirmation Wave</span>
+                ` : `
+                <span style="color:#16a34a; font-weight:600;"><i class="fa-solid fa-truck-fast"></i> À régler à la livraison</span>
+                `}
             </div>
 
             <!-- BOUTON WHATSAPP DIRECT DU REÇU -->
-            <a href="${waUrl}" target="_blank" class="btn btn-whatsapp btn-block" style="display:flex; align-items:center; justify-content:center; gap:8px; padding:12px; font-weight:700; margin-bottom:10px; border-radius:8px;">
-                <i class="fa-brands fa-whatsapp" style="font-size:1.25rem;"></i> Recevoir mon reçu sur WhatsApp
+            <a href="${waUrl}" target="_blank" class="btn btn-whatsapp btn-block" style="display:flex; align-items:center; justify-content:center; gap:8px; padding:12px; font-weight:700; margin-bottom:10px; border-radius:8px; ${isWave ? 'background:#25D366; box-shadow:0 4px 15px rgba(37,211,102,0.3);' : ''}">
+                <i class="fa-brands fa-whatsapp" style="font-size:1.25rem;"></i> ${isWave ? 'Envoyer mon reçu Wave sur WhatsApp' : 'Recevoir mon reçu sur WhatsApp'}
             </a>
 
             <!-- BOUTON VOIR REÇU GRAND FORMAT / IMPRIMER -->
@@ -9117,12 +9370,6 @@ function renderInvoiceTicket(order) {
         `;
     }
 }
-
-
-
-
-
-
 
 elements.btnCheckoutCloseComplete.addEventListener("click", () => {
 
@@ -11851,6 +12098,13 @@ function renderAdminDashboard() {
 
 
 
+                        const isWaveOrderCard = (o.paymentMethod || '').includes('Wave') || (o.status || '').includes('Wave');
+            const waveConfirmBtnHtml = (isWaveOrderCard && o.status.includes('attente')) ? `
+                <button type="button" class="btn btn-sm" onclick="confirmWavePayment('${o.id}')" style="background:#0099e5; color:#ffffff; border:none; padding:6px 12px; border-radius:6px; font-weight:700; font-size:0.8rem; margin-top:8px; cursor:pointer; display:inline-flex; align-items:center; gap:6px;">
+                    <i class="fa-solid fa-circle-check"></i> Valider paiement Wave
+                </button>
+            ` : '';
+
             if (isSuper || userPermissions.canManageOrders) {
 
 
@@ -12147,6 +12401,7 @@ function renderAdminDashboard() {
 
 
 
+                        ${waveConfirmBtnHtml}
                         <button class="btn-quick" onclick="viewOrderInvoiceModal('${o.id}')" title="Voir le reçu / Imprimer le bordereau">
 
 
@@ -14088,6 +14343,72 @@ elements.productAdminForm.addEventListener("submit", async (e) => {
 
 
 
+
+// ========================================================
+// WAVE PAYMENT SYSTEM & HELPER FUNCTIONS
+// ========================================================
+
+let customWaveQrBase64 = "";
+
+window.copyWaveVendorNumber = function () {
+    const shopSettings = JSON.parse(localStorage.getItem("diaw_shoop_settings")) || {};
+    const waveNum = (shopSettings.waveNumber || "77 123 45 67").trim();
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(waveNum).then(() => {
+            showToast("Numéro Wave copié : " + waveNum, "success");
+            const btn = document.getElementById("btn-copy-wave-number");
+            if (btn) {
+                const span = btn.querySelector("span");
+                if (span) span.textContent = "Copié !";
+                setTimeout(() => { if (span) span.textContent = "Copier"; }, 2000);
+            }
+        }).catch(() => {
+            prompt("Copiez le numéro Wave de la boutique :", waveNum);
+        });
+    } else {
+        prompt("Copiez le numéro Wave de la boutique :", waveNum);
+    }
+};
+
+window.copyWaveAmount = function () {
+    const total = checkoutDetails.total || 0;
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(String(total)).then(() => {
+            showToast("Montant copié : " + total.toLocaleString("fr-FR") + " FCFA", "info");
+        });
+    }
+};
+
+window.confirmWavePayment = async function (orderId) {
+    const order = (orders || []).find(o => String(o.id) === String(orderId) || String(o.reference) === String(orderId));
+    if (!order) {
+        showToast("Commande introuvable.", "warning");
+        return;
+    }
+
+    const previousStatus = order.status;
+    order.status = "Payée (En cours de préparation)";
+
+    try {
+        localStorage.setItem("diaw_shoop_orders", JSON.stringify(orders));
+    } catch (e) {
+        console.warn("Storage notice:", e);
+    }
+
+    if (supabaseClient && typeof db !== "undefined" && db.updateOrderStatus) {
+        try {
+            await db.updateOrderStatus(order.id, order.status);
+        } catch (err) {
+            console.warn("Supabase order status notice:", err);
+        }
+    }
+
+    showToast("Paiement Wave confirmé avec succès pour la commande #" + (order.reference || order.id) + " !", "success");
+    try { renderAdminDashboard(); } catch (e) {}
+    try { if (elements.myOrdersModal && elements.myOrdersModal.classList.contains("open")) openMyOrdersModal(); } catch (e) {}
+};
+
+
 function applyStoreSettings() {
 
 
@@ -14197,7 +14518,51 @@ function applyStoreSettings() {
 
 
     };
-    // Invoice Modal Logo & Name
+    // Update Wave Settings in DOM (Admin Settings & Checkout Display)
+    const waveEnabled = settings.waveEnabled !== false;
+    const waveNumber = settings.waveNumber || settings.payoutNumber || "77 123 45 67";
+    const waveAccountName = settings.waveAccountName || settings.shopName || "DIAW SHOOP";
+    const waveQrCode = settings.waveQrCodeImage || "assets/wave_qr_placeholder.svg";
+
+    // Admin fields
+    const adminWaveEnabledEl = document.getElementById("settings-wave-enabled");
+    if (adminWaveEnabledEl) adminWaveEnabledEl.checked = waveEnabled;
+
+    const adminWaveNumberEl = document.getElementById("settings-wave-number");
+    if (adminWaveNumberEl) adminWaveNumberEl.value = waveNumber;
+
+    const adminWaveNameEl = document.getElementById("settings-wave-account-name");
+    if (adminWaveNameEl) adminWaveNameEl.value = waveAccountName;
+
+    const adminWaveQrUrlEl = document.getElementById("settings-wave-qr-url");
+    if (adminWaveQrUrlEl && !adminWaveQrUrlEl.value && waveQrCode.startsWith("http")) {
+        adminWaveQrUrlEl.value = waveQrCode;
+    }
+
+    const adminWavePreviewImg = document.getElementById("wave-qr-admin-preview");
+    const adminWavePlaceholder = document.getElementById("wave-qr-admin-placeholder");
+    if (adminWavePreviewImg) {
+        adminWavePreviewImg.src = waveQrCode;
+        adminWavePreviewImg.style.display = "block";
+        if (adminWavePlaceholder) adminWavePlaceholder.style.display = "none";
+    }
+
+    // Checkout Displays
+    const checkoutWaveCard = document.getElementById("method-card-wave");
+    if (checkoutWaveCard) {
+        checkoutWaveCard.style.display = waveEnabled ? "block" : "none";
+    }
+
+    const checkoutWaveNumEl = document.getElementById("wave-vendor-number-display");
+    if (checkoutWaveNumEl) checkoutWaveNumEl.textContent = waveNumber;
+
+    const checkoutWaveNameEl = document.getElementById("wave-vendor-name-display");
+    if (checkoutWaveNameEl) checkoutWaveNameEl.textContent = "Destinataire : " + waveAccountName;
+
+    const checkoutWaveQrImg = document.getElementById("wave-qr-display-img");
+    if (checkoutWaveQrImg) checkoutWaveQrImg.src = waveQrCode;
+
+        // Invoice Modal Logo & Name
     const modalInvoiceLogo = document.getElementById("modal-invoice-shop-logo");
     if (modalInvoiceLogo) {
         modalInvoiceLogo.src = logoImgUrl;
@@ -15007,7 +15372,8 @@ if (shopSettingsForm) {
 
 
 
-        const googleClientId = document.getElementById("settings-google-client-id").value.trim() || "616654931328-e2qe49rge45fulu769pd21gemfhc2ovs.apps.googleusercontent.com";
+        const googleClientInput = document.getElementById("settings-google-client-id");
+        const googleClientId = (googleClientInput && googleClientInput.value.trim()) ? googleClientInput.value.trim() : (currentSettings.googleClientId || "616654931328-e2qe49rge45fulu769pd21gemfhc2ovs.apps.googleusercontent.com");
 
 
 
@@ -15019,7 +15385,12 @@ if (shopSettingsForm) {
 
 
 
-        const payoutCarrier = document.getElementById("settings-payout-carrier").value || "wave";
+        const payoutCarrier = document.getElementById("settings-payout-carrier") ? document.getElementById("settings-payout-carrier").value : "wave";
+        const waveEnabled = document.getElementById("settings-wave-enabled") ? document.getElementById("settings-wave-enabled").checked : true;
+        const waveNumber = document.getElementById("settings-wave-number") ? document.getElementById("settings-wave-number").value.trim() : (payoutNumber || "77 123 45 67");
+        const waveAccountName = document.getElementById("settings-wave-account-name") ? document.getElementById("settings-wave-account-name").value.trim() : (shopName || "DIAW SHOOP");
+        const waveQrUrlInput = document.getElementById("settings-wave-qr-url") ? document.getElementById("settings-wave-qr-url").value.trim() : "";
+        const waveQrCodeImage = customWaveQrBase64 || waveQrUrlInput || currentSettings.waveQrCodeImage || "assets/wave_qr_placeholder.svg";
 
 
 
@@ -15105,21 +15476,10 @@ if (shopSettingsForm) {
 
 
         const newSettings = {
-
-
-
             whatsapp, email, address, hours, instagram, facebook, tiktok,
-
-
-
             googleClientId, shopName, shopLogo, payoutNumber, payoutCarrier,
-
-
-
+            waveEnabled, waveNumber, waveAccountName, waveQrCodeImage,
             promotionsEnabled, promoBannerText, deliveryPricing
-
-
-
         };
 
 
@@ -18765,4 +19125,71 @@ if (typeof window !== "undefined") {
             initFullscreenViewer();
         }
     }
+}
+
+
+
+// ========================================================
+// FLOATING QUICK-CART PILL & SCROLL TO TOP CONTROLLER
+// ========================================================
+
+function updateFloatingCartUI() {
+    const pill = document.getElementById("floating-cart-pill");
+    const badge = document.getElementById("floating-cart-badge");
+    const totalEl = document.getElementById("floating-cart-total");
+
+    if (!pill) return;
+
+    const totalItems = (typeof cart !== "undefined" && Array.isArray(cart))
+        ? cart.reduce((sum, item) => sum + item.qty, 0)
+        : 0;
+
+    const subtotal = (typeof cart !== "undefined" && Array.isArray(cart))
+        ? cart.reduce((sum, item) => sum + (item.price * item.qty), 0)
+        : 0;
+
+    if (badge) badge.textContent = totalItems;
+    if (totalEl) totalEl.textContent = Number(subtotal).toLocaleString("fr-FR") + " FCFA";
+
+    if (totalItems > 0) {
+        pill.classList.add("visible");
+    } else {
+        pill.classList.remove("visible");
+    }
+}
+
+// Hook into window scroll
+window.addEventListener("scroll", () => {
+    const btnScrollTop = document.getElementById("btn-scroll-top");
+    if (btnScrollTop) {
+        if (window.scrollY > 300) {
+            btnScrollTop.classList.add("visible");
+        } else {
+            btnScrollTop.classList.remove("visible");
+        }
+    }
+}, { passive: true });
+
+// Floating triggers
+const floatingCartPill = document.getElementById("floating-cart-pill");
+if (floatingCartPill) {
+    floatingCartPill.addEventListener("click", () => {
+        if (elements.cartSidebar && elements.sidebarOverlay) {
+            elements.cartSidebar.classList.add("open");
+            elements.sidebarOverlay.classList.add("open");
+        }
+    });
+}
+
+const btnScrollTop = document.getElementById("btn-scroll-top");
+if (btnScrollTop) {
+    btnScrollTop.addEventListener("click", () => {
+        window.scrollTo({ top: 0, behavior: "smooth" });
+    });
+}
+
+try {
+    updateFloatingCartUI();
+} catch (e) {
+    console.warn("Floating cart UI init:", e);
 }
